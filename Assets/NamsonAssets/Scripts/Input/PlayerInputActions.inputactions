@@ -2,7 +2,7 @@
     "name": "PlayerInputActions",
     "maps": [
         {
-            "name": "Mouse",
+            "name": "Inventory",
             "id": "b05855d7-cdd9-498a-8093-10ac83a27246",
             "actions": [
                 {
@@ -21,6 +21,15 @@
                     "expectedControlType": "",
                     "processors": "",
                     "interactions": "Press(behavior=2)",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "RightClick",
+                    "type": "Button",
+                    "id": "d6e74cab-a5e7-4855-80b0-ea128b9f3f9e",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
                     "initialStateCheck": true
                 },
                 {
@@ -64,6 +73,17 @@
                     "processors": "",
                     "groups": "MouseKeyboard",
                     "action": "Reset",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "2cfbeb45-b71c-407a-8d0a-fc78909bbdc1",
+                    "path": "<Mouse>/rightButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "RightClick",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

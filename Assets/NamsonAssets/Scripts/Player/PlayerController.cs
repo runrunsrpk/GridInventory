@@ -9,6 +9,14 @@ public class PlayerController : MonoBehaviour
 
     private bool isDragging = false;
 
+    private bool IsMouseKeyboardScheme
+    {
+        get
+        {
+            return playerInput.currentControlScheme == "MouseKeyboard";
+        }
+    }
+
     private void Awake()
     {
         if (mainCamera == null)
@@ -25,17 +33,27 @@ public class PlayerController : MonoBehaviour
 
     private void Update()
     {
-        if (playerInputAction.leftClick && !isDragging)
+        if(IsMouseKeyboardScheme)
         {
-            StartDrag();
-        }
-        else if(playerInputAction.leftClick && isDragging)
-        {
-            HoldDrag();
-        }
-        else if(!playerInputAction.leftClick && isDragging)
-        {
-            CancelDrag();
+            // handle drag
+            if (playerInputAction.leftClick && !isDragging)
+            {
+                StartDrag();
+            }
+            else if (playerInputAction.leftClick && isDragging)
+            {
+                HoldDrag();
+            }
+            else if (!playerInputAction.leftClick && isDragging)
+            {
+                CancelDrag();
+            }
+
+            // handle rotate
+            if (playerInputAction.leftClick && playerInputAction.rightClick && isDragging)
+            {
+                RotateDrag();
+            }
         }
     }
 
@@ -48,6 +66,12 @@ public class PlayerController : MonoBehaviour
     private void HoldDrag()
     {
         Debug.Log($"Hold drag");
+    }
+
+    private void RotateDrag()
+    {
+        Debug.Log($"Rotate drag");
+        playerInputAction.rightClick = false;
     }
 
     private void CancelDrag()
