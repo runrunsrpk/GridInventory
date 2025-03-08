@@ -21,6 +21,7 @@ public class UIInventory : MonoBehaviour
     private UIInventorySlot[,] grid;
     private int currentX = -1;
     private int currentY = -1;
+    private int placementOrderCounter = 0;
 
     private void Start()
     {
@@ -39,14 +40,14 @@ public class UIInventory : MonoBehaviour
         }
     }
 
-    public void ClearInventorySlotHighlight()
-    {
-        SetAllInventorySlotHighlight(0);
-    }
-
     public bool CheckRepeatedSlot(int x, int y)
     {
         return currentX == x && currentY == y;
+    }
+
+    public void ResetRepeatedSlotCheck()
+    {
+        currentX = 0; currentY = 0;
     }
 
     // Checks if an item can be placed at the specified position
@@ -55,31 +56,18 @@ public class UIInventory : MonoBehaviour
         // Check if we have a valid item
         if (itemData == null) return false;
 
+        // Check weight limit
+        if (currentWeight + itemData.weight > maxWeight)
+            return false;
+
+        currentX = x; currentY = y;
+
         // Use provided shape or default to item's shape
         bool[,] shape = rotatedShape ?? itemData.shape;
         int shapeWidth = shape.GetLength(0);
         int shapeHeight = shape.GetLength(1);
 
-        // Check highlight slot
-        ClearInventorySlotHighlight();
-        for (int i = 0; i < shapeWidth; i++)
-        {
-            for (int j = 0; j < shapeHeight; j++)
-            {
-                if (shape[i, j])
-                {
-                    if (x + i >= width || y + j >= height || grid[x + i, y + j].HasItem())
-                    {
-                        SetInventorySlotHighlight(x + i, y + j, 3);
-                    }
-                    else
-                    {
-                        SetInventorySlotHighlight(x + i, y + j, 2);
-                    }
-
-                }
-            }
-        }
+        UpdateSlotHightlight(x, y, shape);
 
         // Check if out of bounds
         if (x < 0 || y < 0 || x + shapeWidth > width || y + shapeHeight > height)
@@ -98,11 +86,52 @@ public class UIInventory : MonoBehaviour
             }
         }
 
-        // Check weight limit
-        if (currentWeight + itemData.weight > maxWeight)
-            return false;
 
         return true;
+    }
+
+    private void UpdateSlotHightlight(int x, int y, bool[,] shape)
+    {
+        int shapeWidth = shape.GetLength(0);
+        int shapeHeight = shape.GetLength(1);
+
+        UpdateAllInventorySlotHighlight();
+        bool isDeny = false;
+
+        // Check all highlight slot
+        for (int i = 0; i < shapeWidth; i++)
+        {
+            for (int j = 0; j < shapeHeight; j++)
+            {
+                if (!shape[i, j])
+                    continue;
+
+                if (x + width < 0 || y + height < 0 || x + i >= width || y + j >= height || grid[x + i, y + j].HasItem())
+                {
+                    isDeny = true;
+                    break;
+                }
+            }
+        }
+
+        // Show highlight slot
+        for (int i = 0; i < shapeWidth; i++)
+        {
+            for (int j = 0; j < shapeHeight; j++)
+            {
+                if (!shape[i, j])
+                    continue;
+
+                if (isDeny)
+                {
+                    SetInventorySlotHighlight(x + i, y + j, 3);
+                }
+                else
+                {
+                    SetInventorySlotHighlight(x + i, y + j, 2);
+                }
+            }
+        }
     }
 
     // Places an item in the inventory
@@ -123,19 +152,21 @@ public class UIInventory : MonoBehaviour
                 if (shape[i, j])
                 {
                     grid[x + i, y + j].SetItem(item);
+                    SetInventorySlotHighlight(x + i, y + j, 1);
                 }
             }
         }
 
         // Set item properties
-        //item.SetGridPosition(x, y);
-        //item.PlacementOrder = ++placementOrderCounter;
+        item.SetGridPosition(x, y);
+        item.PlacementOrder = ++placementOrderCounter;
 
         // Add to tracking
         //placedItems.Add(item);
 
         // Update weight
         currentWeight += item.GetItemData().weight;
+        SetCurrentWeight(currentWeight);
         //OnWeightChanged?.Invoke(currentWeight, maxWeight);
 
         // Notify listeners
@@ -145,37 +176,39 @@ public class UIInventory : MonoBehaviour
     }
 
     // Removes an item from the inventory
-    //public void RemoveItem(DraggableItem item)
-    //{
-    //    int x = item.GridX;
-    //    int y = item.GridY;
+    public void RemoveItem(DraggableItem item)
+    {
+        int x = item.GridX;
+        int y = item.GridY;
 
-    //    bool[,] shape = item.GetShape();
-    //    int shapeWidth = shape.GetLength(0);
-    //    int shapeHeight = shape.GetLength(1);
+        bool[,] shape = item.GetShape();
+        int shapeWidth = shape.GetLength(0);
+        int shapeHeight = shape.GetLength(1);
 
-    //    // Clear grid slots
-    //    for (int i = 0; i < shapeWidth; i++)
-    //    {
-    //        for (int j = 0; j < shapeHeight; j++)
-    //        {
-    //            if (shape[i, j] && x + i < width && y + j < height)
-    //            {
-    //                grid[x + i, y + j].ClearItem();
-    //            }
-    //        }
-    //    }
+        // Clear grid slots
+        for (int i = 0; i < shapeWidth; i++)
+        {
+            for (int j = 0; j < shapeHeight; j++)
+            {
+                if (shape[i, j] && x + i < width && y + j < height)
+                {
+                    grid[x + i, y + j].ClearItem();
+                }
+            }
+        }
 
-    //    // Remove from tracking
-    //    //placedItems.Remove(item);
+        // Remove from tracking
+        //placedItems.Remove(item);
 
-    //    // Update weight
-    //    currentWeight -= item.GetItemData().weight;
-    //    //OnWeightChanged?.Invoke(currentWeight, maxWeight);
+        // Update weight
+        currentWeight -= item.GetItemData().weight;
+        SetCurrentWeight(currentWeight);
+        //OnWeightChanged?.Invoke(currentWeight, maxWeight);
 
-    //    // Notify listeners
-    //    //OnItemRemoved?.Invoke(item);
-    //}
+        // Notify listeners
+        //OnItemRemoved?.Invoke(item);
+        UpdateAllInventorySlotHighlight();
+    }
 
     private void SpawnInventorySlot()
     {
@@ -194,6 +227,24 @@ public class UIInventory : MonoBehaviour
         }
     }
 
+    public void UpdateAllInventorySlotHighlight()
+    {
+        for (int x = 0; x < width; x++)
+        {
+            for (int y = 0; y < height; y++)
+            {
+                if (grid[x, y].HasItem())
+                {
+                    SetInventorySlotHighlight(x, y, 1);
+                }
+                else
+                {
+                    SetInventorySlotHighlight(x, y, 0);
+                }
+            }
+        }
+    }
+
     private void SetAllInventorySlotHighlight(int highlight)
     {
         for (int x = 0; x < width; x++)
@@ -207,6 +258,9 @@ public class UIInventory : MonoBehaviour
 
     private void SetInventorySlotHighlight(int x, int y, int highlight)
     {
+        if (x < 0 || y < 0 || x >= width || y >= height)
+            return;
+
         grid[x, y].SetHighlightColor(highlight);
     }
 

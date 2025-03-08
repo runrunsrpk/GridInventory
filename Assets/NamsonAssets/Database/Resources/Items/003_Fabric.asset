@@ -17,6 +17,8 @@ MonoBehaviour:
   icon: {fileID: 21300000, guid: e1882d312d7c2a343bf51da4fbeb0598, type: 3}
   width: 2
   height: 2
-  weight: 10
+  weight: 2
   type: 2
+  offsetX: -0.1
+  offsetY: -0.1
   serializedShape: 01010101

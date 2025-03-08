@@ -7,6 +7,13 @@ public enum ItemType
     Misc
 }
 
+public enum ShapeType
+{
+    Square,
+    Rectangle,
+    LShape
+}
+
 [CreateAssetMenu(fileName = "NewItem", menuName = "Inventory/Item")]
 public class ItemData : ScriptableObject, ISerializationCallbackReceiver
 {
@@ -17,6 +24,9 @@ public class ItemData : ScriptableObject, ISerializationCallbackReceiver
     public int height;
     public float weight;
     public ItemType type;
+    public float offsetX;
+    public float offsetY;
+    public ShapeType shapeType;
 
     [HideInInspector] public bool[,] shape;
     [HideInInspector, SerializeField] private bool[] serializedShape;

@@ -19,4 +19,6 @@ MonoBehaviour:
   height: 2
   weight: 2
   type: 1
+  offsetX: -0.1
+  offsetY: -0.1
   serializedShape: 01010101

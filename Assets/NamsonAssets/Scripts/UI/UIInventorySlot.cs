@@ -1,6 +1,7 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using static UnityEditor.Progress;
 
 public class UIInventorySlot : MonoBehaviour
 {
@@ -8,9 +9,14 @@ public class UIInventorySlot : MonoBehaviour
     private int x;
     public int Y => y;
     private int y;
-    private DraggableItem currentItem;
 
+    [Header("UI")]
     [SerializeField] private Image image;
+    [SerializeField] private TMP_Text itemNameText;
+    [SerializeField] private TMP_Text indexText;
+
+    [Header("Slot")]
+    [SerializeField] private DraggableItem currentItem;
     [SerializeField] private Color slotDefaultColor;
     [SerializeField] private Color slotPlacedColor;
     [SerializeField] private Color slotAllowColor;
@@ -25,6 +31,7 @@ public class UIInventorySlot : MonoBehaviour
     {
         this.x = x;
         this.y = y;
+        indexText.text = $"({x},{y})";
     }
 
     public void SetHighlightColor(int highlight)
@@ -52,10 +59,17 @@ public class UIInventorySlot : MonoBehaviour
     public void SetItem(DraggableItem item)
     {
         currentItem = item;
+        itemNameText.text = item.GetItemData().itemName;
+    }
+
+    public DraggableItem GetItem()
+    {
+        return currentItem;
     }
 
     public void ClearItem()
     {
         currentItem = null;
+        itemNameText.text = "";
     }
 }

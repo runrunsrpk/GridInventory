@@ -1,13 +1,20 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 public class DraggableItem : MonoBehaviour
 {
+    public int GridX => gridX;
+    [SerializeField] private int gridX;
+    public int GridY => gridY;
+    [SerializeField] private int gridY;
     [SerializeField] private Image image;
 
+    public int PlacementOrder {  get => placementOrder; set => placementOrder = value; }
     private int placementOrder;
     private ItemData itemData;
     private bool[,] rotatedShape;
+    public int RotationStapes => rotationSteps;
     private int rotationSteps = 0; // 0, 1, 2, 3 for 0, 90, 180, 270 degrees
 
     public void Init(ItemData itemData)
@@ -15,6 +22,9 @@ public class DraggableItem : MonoBehaviour
         this.itemData = itemData;
         image.sprite = itemData.icon;
         rotatedShape = (bool[,])itemData.shape.Clone();
+
+        UpdateImageScale();
+
         //DebugShape();
     }
 
@@ -22,6 +32,12 @@ public class DraggableItem : MonoBehaviour
     {
         rotationSteps = (rotationSteps + 1) % 4;
         UpdateRotatedShape();
+    }
+
+    public void SetGridPosition(int gridX, int gridY)
+    {
+        this.gridX = gridX;
+        this.gridY = gridY;
     }
 
     public ItemData GetItemData()
@@ -32,6 +48,18 @@ public class DraggableItem : MonoBehaviour
     public bool[,] GetShape()
     {
         return rotatedShape;
+    }
+
+    private void UpdateImageScale()
+    {
+        float scaleX = 1f;
+        float scaleY = 1f;
+        if (itemData.shapeType == ShapeType.Square)
+        {
+            scaleX = (itemData.width == 1) ? 0.5f : 1f;
+            scaleY = (itemData.height == 1) ? 0.5f : 1f;
+        }
+        transform.localScale = new Vector3(scaleX, scaleY, 1f);
     }
 
     private void UpdateRotatedShape()
