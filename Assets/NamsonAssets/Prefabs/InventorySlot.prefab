@@ -67,8 +67,8 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 0}
-  m_Type: 0
+  m_Sprite: {fileID: 10905, guid: 0000000000000000f000000000000000, type: 0}
+  m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
   m_FillMethod: 4
@@ -89,9 +89,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 60ed06a4afba8584abb67a887230a407, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  image: {fileID: 2045682600672857099}
   slotDefaultColor: {r: 1, g: 1, b: 1, a: 1}
-  slotAllowColor: {r: 0, g: 1, b: 0, a: 1}
-  slotDenyColor: {r: 1, g: 0, b: 0, a: 1}
+  slotPlacedColor: {r: 1, g: 0.47362727, b: 0, a: 0.5019608}
+  slotAllowColor: {r: 0, g: 1, b: 0, a: 0.5019608}
+  slotDenyColor: {r: 1, g: 0, b: 0, a: 0.5019608}
 --- !u!61 &8745686931257620711
 BoxCollider2D:
   m_ObjectHideFlags: 0
@@ -122,7 +124,7 @@ BoxCollider2D:
   m_CallbackLayers:
     serializedVersion: 2
     m_Bits: 4294967295
-  m_IsTrigger: 1
+  m_IsTrigger: 0
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0

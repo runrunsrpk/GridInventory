@@ -15,5 +15,8 @@ MonoBehaviour:
   itemID: 002
   itemName: Log
   icon: {fileID: 21300000, guid: bd6fc63d01186844794300392f91a237, type: 3}
+  width: 2
+  height: 1
   weight: 2
   type: 2
+  serializedShape: 0101

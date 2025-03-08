@@ -87,7 +87,7 @@ GameObject:
   - component: {fileID: 8960397676849621463}
   - component: {fileID: 3057836388592384250}
   - component: {fileID: 4248701698367174903}
-  - component: {fileID: 4204192101695794035}
+  - component: {fileID: 6127259056665084553}
   m_Layer: 5
   m_Name: SpawnItemSlot
   m_TagString: Untagged
@@ -167,8 +167,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   itemData: {fileID: 0}
   icon: {fileID: 5281632312436534271}
-  boxCollider: {fileID: 4204192101695794035}
---- !u!61 &4204192101695794035
+  boxCollider: {fileID: 6127259056665084553}
+  draggablePrefab: {fileID: 4129289081632587032, guid: ea72e1faaec138b4182c2fe3b7975699, type: 3}
+--- !u!61 &6127259056665084553
 BoxCollider2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -198,7 +199,7 @@ BoxCollider2D:
   m_CallbackLayers:
     serializedVersion: 2
     m_Bits: 4294967295
-  m_IsTrigger: 1
+  m_IsTrigger: 0
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0

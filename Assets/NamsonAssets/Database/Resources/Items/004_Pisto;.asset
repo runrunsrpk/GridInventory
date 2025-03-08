@@ -15,5 +15,8 @@ MonoBehaviour:
   itemID: 004
   itemName: Pistol
   icon: {fileID: 21300000, guid: 711a408aa05671e40aa2ae90905543a1, type: 3}
+  width: 2
+  height: 2
   weight: 1
   type: 0
+  serializedShape: 01010100

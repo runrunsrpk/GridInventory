@@ -8,60 +8,38 @@ public enum ItemType
 }
 
 [CreateAssetMenu(fileName = "NewItem", menuName = "Inventory/Item")]
-public class ItemData : ScriptableObject
+public class ItemData : ScriptableObject, ISerializationCallbackReceiver
 {
     public string itemID;
     public string itemName;
     public Sprite icon;
+    public int width;
+    public int height;
     public float weight;
     public ItemType type;
+
     [HideInInspector] public bool[,] shape;
+    [HideInInspector, SerializeField] private bool[] serializedShape;
 
-    // create default shape
-    private void OnEnable()
+    public void OnBeforeSerialize()
     {
-        if (shape == null)
+        serializedShape = new bool[width * height];
+        if (shape != null)
         {
-            shape = new bool[1, 1];
-            shape[0, 0] = true;
+            for (int x = 0; x < width; x++)
+                for (int y = 0; y < height; y++)
+                    serializedShape[x + y * width] = shape[x, y];
         }
     }
 
-    public ItemData Clone()
+    public void OnAfterDeserialize()
     {
-        ItemData clone = Instantiate(this);
-        clone.name = this.name;
-
-        // คลอน shape array
-        bool[,] shapeClone = new bool[shape.GetLength(0), shape.GetLength(1)];
-        for (int x = 0; x < shape.GetLength(0); x++)
+        shape = new bool[width, height];
+        if (serializedShape != null && serializedShape.Length == width * height)
         {
-            for (int y = 0; y < shape.GetLength(1); y++)
-            {
-                shapeClone[x, y] = shape[x, y];
-            }
+            for (int x = 0; x < width; x++)
+                for (int y = 0; y < height; y++)
+                    shape[x, y] = serializedShape[x + y * width];
         }
-        clone.shape = shapeClone;
-
-        return clone;
-    }
-
-    public string GetSummary()
-    {
-        int gridCount = CountGridCells();
-        return $"{itemName}\nWeight: {weight} kg\nSize: {gridCount} grid{(gridCount > 1 ? "s" : "")}";
-    }
-
-    public int CountGridCells()
-    {
-        int count = 0;
-        for (int x = 0; x < shape.GetLength(0); x++)
-        {
-            for (int y = 0; y < shape.GetLength(1); y++)
-            {
-                if (shape[x, y]) count++;
-            }
-        }
-        return count;
     }
 }

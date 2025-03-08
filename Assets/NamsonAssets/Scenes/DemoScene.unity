@@ -211,6 +211,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 23238c46886964247adb578ff200ac93, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  inventory: {fileID: 1352139204}
+  originPosition: {x: 0, y: 0, z: 0}
+  selectedDraggable: {fileID: 0}
+  selectedSpawnSlot: {fileID: 0}
+  selectedInventorySlot: {fileID: 0}
 --- !u!1 &148813478
 GameObject:
   m_ObjectHideFlags: 0
@@ -1492,8 +1497,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 32e1ddb3070a5a6498b278cd90bed86b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  row: 5
-  column: 5
+  width: 5
+  height: 5
   maxWeight: 8
   slotPrefab: {fileID: 403498423285494154, guid: f421ef8ec3106704088f23f5fc24fad5, type: 3}
   slotParent: {fileID: 2014944462}
@@ -2072,7 +2077,7 @@ MonoBehaviour:
   m_StartCorner: 0
   m_StartAxis: 0
   m_CellSize: {x: 100, y: 100}
-  m_Spacing: {x: 15, y: 15}
+  m_Spacing: {x: 0, y: 0}
   m_Constraint: 1
   m_ConstraintCount: 5
 --- !u!1 &2129851047

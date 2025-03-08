@@ -4,26 +4,6 @@ using UnityEngine;
 [CustomEditor(typeof(ItemData))]
 public class ItemSOEditor : Editor
 {
-    private SerializedProperty shapeProperty;
-    private int width = 1;
-    private int height = 1;
-
-    private void OnEnable()
-    {
-        ItemData item = (ItemData)target;
-
-        // default shape
-        if (item.shape == null)
-        {
-            item.shape = new bool[1, 1];
-            item.shape[0, 0] = true;
-        }
-
-        // set width and height
-        width = item.shape.GetLength(0);
-        height = item.shape.GetLength(1);
-    }
-
     public override void OnInspectorGUI()
     {
         // show default inspector
@@ -34,15 +14,6 @@ public class ItemSOEditor : Editor
         EditorGUILayout.LabelField("Item Shape", EditorStyles.boldLabel);
 
         ItemData item = (ItemData)target;
-
-        EditorGUILayout.BeginVertical();
-        width = EditorGUILayout.IntField("Width", width);
-        height = EditorGUILayout.IntField("Height", height);
-        if (GUILayout.Button("Resize"))
-        {
-            ResizeShapeArray(item);
-        }
-        EditorGUILayout.EndVertical();
 
         // show checkbox on grid
         if (item.shape != null)
@@ -97,26 +68,5 @@ public class ItemSOEditor : Editor
             }
             EditorGUILayout.EndVertical();
         }
-    }
-
-    private void ResizeShapeArray(ItemData item)
-    {
-        Undo.RecordObject(item, "Resize Item Shape");
-
-        bool[,] newShape = new bool[width, height];
-
-        int oldWidth = item.shape != null ? item.shape.GetLength(0) : 0;
-        int oldHeight = item.shape != null ? item.shape.GetLength(1) : 0;
-
-        for (int x = 0; x < Mathf.Min(oldWidth, width); x++)
-        {
-            for (int y = 0; y < Mathf.Min(oldHeight, height); y++)
-            {
-                newShape[x, y] = item.shape[x, y];
-            }
-        }
-
-        item.shape = newShape;
-        EditorUtility.SetDirty(item);
     }
 }

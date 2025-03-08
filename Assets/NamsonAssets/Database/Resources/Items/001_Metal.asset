@@ -15,5 +15,8 @@ MonoBehaviour:
   itemID: 001
   itemName: Metal
   icon: {fileID: 21300000, guid: 4c0006354f0b71f4b8a1b439e6d09faf, type: 3}
+  width: 1
+  height: 1
   weight: 3
   type: 2
+  serializedShape: 01

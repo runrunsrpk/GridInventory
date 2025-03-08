@@ -15,5 +15,8 @@ MonoBehaviour:
   itemID: 007
   itemName: Carrot
   icon: {fileID: 21300000, guid: c011e6df3e6d1094ab6a0157ba732a6b, type: 3}
+  width: 1
+  height: 1
   weight: 0.25
   type: 2
+  serializedShape: 01

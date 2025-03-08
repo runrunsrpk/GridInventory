@@ -15,5 +15,8 @@ MonoBehaviour:
   itemID: 006
   itemName: Jacket
   icon: {fileID: 21300000, guid: c9e9faedb45dce8488c101c4af989dad, type: 3}
+  width: 2
+  height: 2
   weight: 2
   type: 1
+  serializedShape: 01010101
