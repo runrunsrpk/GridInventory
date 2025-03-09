@@ -59,7 +59,7 @@ public class UIInventory : MonoBehaviour, IInventory
     // Reset slot check
     public void ResetRepeatedSlotCheck()
     {
-        currentX = 0; currentY = 0;
+        currentX = -1; currentY = -1;
     }
 
     // Checks if an item can be placed at the specified position
@@ -204,7 +204,7 @@ public class UIInventory : MonoBehaviour, IInventory
             {
                 UIInventorySlot slot = Instantiate(slotPrefab, slotParent);
                 slot.name = $"Slot[{x},{y}]";
-                slot.SetIndex(x, y);
+                slot.Init(x, y);
                 grid[x, y] = slot;
             }
         }

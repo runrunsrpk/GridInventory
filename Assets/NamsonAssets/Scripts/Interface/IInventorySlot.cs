@@ -7,5 +7,5 @@ public interface IInventorySlot
     DraggableItem GetItem();
     bool HasItem();
     void SetHighlightColor(int highlightIndex);
-    void SetIndex(int x, int y);
+    void Init(int x, int y);
 }

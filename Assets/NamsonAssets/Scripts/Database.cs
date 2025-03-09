@@ -169,4 +169,9 @@ public class Database : MonoBehaviour
 
         return null;
     }
+
+    public List<string> GetRequiredItemsForBonus(BonusData bonus)
+    {
+        return bonus.bonusRequirement;
+    }
 }

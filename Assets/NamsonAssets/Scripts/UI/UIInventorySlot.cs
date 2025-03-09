@@ -27,11 +27,12 @@ public class UIInventorySlot : MonoBehaviour, IInventorySlot
         return currentItem != null;
     }
 
-    public void SetIndex(int x, int y)
+    public void Init(int x, int y)
     {
         this.x = x;
         this.y = y;
         indexText.text = $"({x},{y})";
+        itemNameText.text = "";
     }
 
     public void SetHighlightColor(int highlight)
