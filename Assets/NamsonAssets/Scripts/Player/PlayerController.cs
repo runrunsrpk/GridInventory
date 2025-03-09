@@ -43,6 +43,8 @@ public class PlayerController : MonoBehaviour
 
         HandleDragging();
         HandleRotation();
+        HandleExitGame();
+
     }
 
     // Process drag operations based on input state
@@ -68,6 +70,15 @@ public class PlayerController : MonoBehaviour
         if (playerInputAction.leftClick && playerInputAction.rightClick && isDragging)
         {
             RotateItem();
+        }
+    }
+
+    private void HandleExitGame()
+    {
+        if (Input.GetKey(KeyCode.Escape))
+        {
+            Debug.Log($"Exit Game");
+            Application.Quit();
         }
     }
 

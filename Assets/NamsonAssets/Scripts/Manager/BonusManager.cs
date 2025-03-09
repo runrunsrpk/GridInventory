@@ -89,6 +89,21 @@ public class BonusManager : IBonusManager
                 return;
             }
         }
+        // NEW CODE: If adjacent to multiple bonus groups, try adding to the one with lowest ID first
+        else if (adjacentBonusGroups.Count > 1)
+        {
+            // Sort groups by ID (lower first)
+            adjacentBonusGroups.Sort();
+
+            // Try each group in order
+            foreach (int groupId in adjacentBonusGroups)
+            {
+                if (TryAddToExistingGroup(item, groupId))
+                {
+                    return;
+                }
+            }
+        }
 
         // If this item isn't part of any group yet, try to form a new group
         // without breaking existing bonuses
