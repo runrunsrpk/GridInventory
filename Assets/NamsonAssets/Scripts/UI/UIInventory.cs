@@ -1,10 +1,13 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class UIInventory : MonoBehaviour
+public class UIInventory : MonoBehaviour, IInventory
 {
+    public static Action<List<BonusData>> OnBonusChanged;
 
     [Header("Inventory Setting")]
     [SerializeField, Range(5, 8)] private int width;
@@ -23,13 +26,20 @@ public class UIInventory : MonoBehaviour
     private int currentY = -1;
     private int placementOrderCounter = 0;
 
+    // Use composition for bonus management
+    private BonusManager bonusManager;
+
     private void Start()
     {
         SpawnInventorySlot();
         SetCurrentWeight(currentWeight);
         SetMaxWeight(maxWeight);
+
+        // Initialize bonus manager
+        bonusManager = new BonusManager(grid, width, height);
     }
 
+    // Check if weight limit would be exceeded
     public void CheckWeight(ItemData itemData)
     {
         if (itemData == null) return;
@@ -40,11 +50,13 @@ public class UIInventory : MonoBehaviour
         }
     }
 
+    // Check for repeated slot selection
     public bool CheckRepeatedSlot(int x, int y)
     {
         return currentX == x && currentY == y;
     }
 
+    // Reset slot check
     public void ResetRepeatedSlotCheck()
     {
         currentX = 0; currentY = 0;
@@ -86,52 +98,7 @@ public class UIInventory : MonoBehaviour
             }
         }
 
-
         return true;
-    }
-
-    private void UpdateSlotHightlight(int x, int y, bool[,] shape)
-    {
-        int shapeWidth = shape.GetLength(0);
-        int shapeHeight = shape.GetLength(1);
-
-        UpdateAllInventorySlotHighlight();
-        bool isDeny = false;
-
-        // Check all highlight slot
-        for (int i = 0; i < shapeWidth; i++)
-        {
-            for (int j = 0; j < shapeHeight; j++)
-            {
-                if (!shape[i, j])
-                    continue;
-
-                if (x + width < 0 || y + height < 0 || x + i >= width || y + j >= height || grid[x + i, y + j].HasItem())
-                {
-                    isDeny = true;
-                    break;
-                }
-            }
-        }
-
-        // Show highlight slot
-        for (int i = 0; i < shapeWidth; i++)
-        {
-            for (int j = 0; j < shapeHeight; j++)
-            {
-                if (!shape[i, j])
-                    continue;
-
-                if (isDeny)
-                {
-                    SetInventorySlotHighlight(x + i, y + j, 3);
-                }
-                else
-                {
-                    SetInventorySlotHighlight(x + i, y + j, 2);
-                }
-            }
-        }
     }
 
     // Places an item in the inventory
@@ -161,16 +128,12 @@ public class UIInventory : MonoBehaviour
         item.SetGridPosition(x, y);
         item.PlacementOrder = ++placementOrderCounter;
 
-        // Add to tracking
-        //placedItems.Add(item);
-
         // Update weight
         currentWeight += item.GetItemData().weight;
         SetCurrentWeight(currentWeight);
-        //OnWeightChanged?.Invoke(currentWeight, maxWeight);
 
-        // Notify listeners
-        //OnItemPlaced?.Invoke(item);
+        // Check for bonuses using the position where the item was placed
+        bonusManager.CheckConnections(new Vector2Int(x, y));
 
         return true;
     }
@@ -185,6 +148,22 @@ public class UIInventory : MonoBehaviour
         int shapeWidth = shape.GetLength(0);
         int shapeHeight = shape.GetLength(1);
 
+        // Store positions to check later
+        HashSet<Vector2Int> neighborPositions = new HashSet<Vector2Int>();
+
+        // Get neighboring positions to check for connections later
+        foreach (var grid in item.OccupiedGrids)
+        {
+            // Add all adjacent positions
+            foreach (var adjPos in bonusManager.GetAdjacentPositions(grid))
+            {
+                if (bonusManager.IsOccupied(adjPos))
+                {
+                    neighborPositions.Add(adjPos);
+                }
+            }
+        }
+
         // Clear grid slots
         for (int i = 0; i < shapeWidth; i++)
         {
@@ -197,24 +176,28 @@ public class UIInventory : MonoBehaviour
             }
         }
 
-        // Remove from tracking
-        //placedItems.Remove(item);
+        // Let bonus manager handle group removal first
+        bonusManager.RemoveItemFromGroups(item);
+
+        // Clear the item
+        item.ClearItem();
 
         // Update weight
         currentWeight -= item.GetItemData().weight;
         SetCurrentWeight(currentWeight);
-        //OnWeightChanged?.Invoke(currentWeight, maxWeight);
 
-        // Notify listeners
-        //OnItemRemoved?.Invoke(item);
+        // Update highlights
         UpdateAllInventorySlotHighlight();
+
+        // Re-check connections for neighboring items
+        bonusManager.RecheckConnections(neighborPositions);
     }
 
     private void SpawnInventorySlot()
     {
         slotParent.GetComponent<GridLayoutGroup>().constraintCount = width;
         grid = new UIInventorySlot[width, height];
-        
+
         for (int x = 0; x < width; x++)
         {
             for (int y = 0; y < height; y++)
@@ -223,6 +206,51 @@ public class UIInventory : MonoBehaviour
                 slot.name = $"Slot[{x},{y}]";
                 slot.SetIndex(x, y);
                 grid[x, y] = slot;
+            }
+        }
+    }
+
+    #region Inventory Highlight
+    private void UpdateSlotHightlight(int x, int y, bool[,] shape)
+    {
+        int shapeWidth = shape.GetLength(0);
+        int shapeHeight = shape.GetLength(1);
+
+        UpdateAllInventorySlotHighlight();
+        bool isDeny = false;
+
+        // Check all highlight slot
+        for (int i = 0; i < shapeWidth; i++)
+        {
+            for (int j = 0; j < shapeHeight; j++)
+            {
+                if (!shape[i, j])
+                    continue;
+
+                if (x + i < 0 || y + j < 0 || x + i >= width || y + j >= height || grid[x + i, y + j].HasItem())
+                {
+                    isDeny = true;
+                    break;
+                }
+            }
+        }
+
+        // Show highlight slot
+        for (int i = 0; i < shapeWidth; i++)
+        {
+            for (int j = 0; j < shapeHeight; j++)
+            {
+                if (!shape[i, j])
+                    continue;
+
+                if (isDeny)
+                {
+                    SetInventorySlotHighlight(x + i, y + j, 3);
+                }
+                else
+                {
+                    SetInventorySlotHighlight(x + i, y + j, 2);
+                }
             }
         }
     }
@@ -263,12 +291,13 @@ public class UIInventory : MonoBehaviour
 
         grid[x, y].SetHighlightColor(highlight);
     }
+    #endregion
 
+    #region Inventory Weight
     private void SetCurrentWeight(float weight)
     {
         currentWeight = weight;
         currentWeightText.text = weight.ToString("n2");
-
     }
 
     private void SetMaxWeight(float weight)
@@ -276,4 +305,5 @@ public class UIInventory : MonoBehaviour
         maxWeight = weight;
         maxWeightText.text = weight.ToString("n2");
     }
+    #endregion
 }

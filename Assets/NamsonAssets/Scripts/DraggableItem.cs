@@ -1,27 +1,51 @@
+using NUnit.Framework;
+using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using static UnityEditor.Progress;
 
+public enum ItemConnectedState
+{
+    Empty,
+    Waiting,
+    Closed,
+    Opened
+}
 public class DraggableItem : MonoBehaviour
 {
+    [SerializeField] private Image image;
+
     public int GridX => gridX;
     [SerializeField] private int gridX;
     public int GridY => gridY;
     [SerializeField] private int gridY;
-    [SerializeField] private Image image;
+
+    public List<Vector2Int> OccupiedGrids => occupiedGrids;
+    private List<Vector2Int> occupiedGrids;
+
+    public ItemConnectedState ConnectedState => connectedState;
+    [SerializeField] private ItemConnectedState connectedState;
+    [SerializeField] private int connectionGroupId = -1;
+
+    public BonusData BonusData => bonusData;
+    private BonusData bonusData;
 
     public int PlacementOrder {  get => placementOrder; set => placementOrder = value; }
     private int placementOrder;
-    private ItemData itemData;
-    private bool[,] rotatedShape;
+
     public int RotationStapes => rotationSteps;
     private int rotationSteps = 0; // 0, 1, 2, 3 for 0, 90, 180, 270 degrees
+
+
+    private ItemData itemData;
+    private bool[,] rotatedShape;
 
     public void Init(ItemData itemData)
     {
         this.itemData = itemData;
         image.sprite = itemData.icon;
         rotatedShape = (bool[,])itemData.shape.Clone();
+        connectedState = ItemConnectedState.Empty;
 
         UpdateImageScale();
 
@@ -38,6 +62,19 @@ public class DraggableItem : MonoBehaviour
     {
         this.gridX = gridX;
         this.gridY = gridY;
+
+        SetOccupiedGrids(new Vector2Int(gridX, gridY));
+    }
+
+    public void SetBonus(BonusData bonus, ItemConnectedState state)
+    {
+        this.bonusData = bonus;
+        this.connectedState = state;
+    }
+
+    public BonusData GetBonusData()
+    {
+        return bonusData;
     }
 
     public ItemData GetItemData()
@@ -48,6 +85,49 @@ public class DraggableItem : MonoBehaviour
     public bool[,] GetShape()
     {
         return rotatedShape;
+    }
+
+    public int GetConnectionGroupId()
+    {
+        return connectionGroupId;
+    }
+
+    public void SetConnectionGroupId(int id)
+    {
+        connectionGroupId = id;
+    }
+
+    public void ClearItem()
+    {
+        connectedState = ItemConnectedState.Empty;
+        occupiedGrids.Clear();
+        ClearConnectionGroup();
+    }
+
+    public void ClearConnectionGroup()
+    {
+        connectionGroupId = -1;
+    }
+
+    private void SetOccupiedGrids(Vector2Int gridIndex)
+    {
+        occupiedGrids = new List<Vector2Int>();
+
+        bool[,] shape = rotatedShape;
+        int shapeWidth = shape.GetLength(0);
+        int shapeHeight = shape.GetLength(1);
+
+        // Place item in grid
+        for (int i = 0; i < shapeWidth; i++)
+        {
+            for (int j = 0; j < shapeHeight; j++)
+            {
+                if (shape[i, j])
+                {
+                    occupiedGrids.Add(new Vector2Int(gridIndex.x + i, gridIndex.y + j));
+                }
+            }
+        }
     }
 
     private void UpdateImageScale()
@@ -110,7 +190,6 @@ public class DraggableItem : MonoBehaviour
 
         // Update visual to match the new rotation
         UpdateVisual();
-        //DebugShape();
     }
 
     private void UpdateVisual()

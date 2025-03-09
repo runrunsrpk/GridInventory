@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using static UnityEditor.Progress;
 
-public class UIInventorySlot : MonoBehaviour
+public class UIInventorySlot : MonoBehaviour, IInventorySlot
 {
     public int X => x;
     private int x;
