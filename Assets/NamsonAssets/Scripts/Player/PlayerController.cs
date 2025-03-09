@@ -1,11 +1,8 @@
-using NUnit.Framework;
-using NUnit.Framework.Interfaces;
-using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
-using static UnityEditor.Progress;
+using System.Collections.Generic;
+using System.Linq;
 
 public class PlayerController : MonoBehaviour
 {
@@ -14,33 +11,24 @@ public class PlayerController : MonoBehaviour
     private Camera mainCamera;
     private PlayerInput playerInput;
     private PlayerInputAction playerInputAction;
-
-    private bool isDragging = false;
-
-    [Header("Debug")]
-    [SerializeField] private Vector3 originPosition;
-    [SerializeField] private DraggableItem selectedDraggable;
-    [SerializeField] private UISpawnItemSlot selectedSpawnSlot;
-    [SerializeField] private UIInventorySlot selectedInventorySlot;
-    [SerializeField] private int originX = -1;
-    [SerializeField] private int originY = -1;
-
     private List<RaycastResult> hitObjects = new List<RaycastResult>();
+    private float gridSize = 128f;
 
-    private bool IsMouseKeyboardScheme
-    {
-        get
-        {
-            return playerInput.currentControlScheme == "MouseKeyboard";
-        }
-    }
+    // Item drag state
+    private bool isDragging = false;
+    private Vector3 originPosition;
+    private DraggableItem selectedDraggable;
+    private UISpawnItemSlot selectedSpawnSlot;
+    private UIInventorySlot selectedInventorySlot;
+    private int originX = -1;
+    private int originY = -1;
+
+    // Control scheme property for better readability
+    private bool IsMouseKeyboardScheme => playerInput.currentControlScheme == "MouseKeyboard";
 
     private void Awake()
     {
-        if (mainCamera == null)
-        {
-            mainCamera = Camera.main;
-        }
+        mainCamera = mainCamera ?? Camera.main;
     }
 
     private void Start()
@@ -51,112 +39,135 @@ public class PlayerController : MonoBehaviour
 
     private void Update()
     {
-        if (IsMouseKeyboardScheme)
-        {
-            // handle drag
-            if (playerInputAction.leftClick && !isDragging)
-            {
-                StartDrag();
-            }
-            else if (playerInputAction.leftClick && isDragging)
-            {
-                HoldDrag();
-            }
-            else if (!playerInputAction.leftClick && isDragging)
-            {
-                CancelDrag();
-            }
+        if (!IsMouseKeyboardScheme) return;
 
-            // handle rotate
-            if (playerInputAction.leftClick && playerInputAction.rightClick && isDragging)
-            {
-                RotateDrag();
-            }
+        HandleDragging();
+        HandleRotation();
+    }
+
+    // Process drag operations based on input state
+    private void HandleDragging()
+    {
+        if (playerInputAction.leftClick && !isDragging)
+        {
+            StartDrag();
+        }
+        else if (playerInputAction.leftClick && isDragging)
+        {
+            HoldDrag();
+        }
+        else if (!playerInputAction.leftClick && isDragging)
+        {
+            CancelDrag();
         }
     }
 
+    // Handle item rotation during drag
+    private void HandleRotation()
+    {
+        if (playerInputAction.leftClick && playerInputAction.rightClick && isDragging)
+        {
+            RotateItem();
+        }
+    }
+
+    // Start dragging an item from spawn slot or inventory
     private void StartDrag()
     {
-        Debug.Log($"Start drag");
-        if (GetRaycastResults().Count > 0)
+        if (GetRaycastResults().Count <= 0) return;
+
+        foreach (RaycastResult result in hitObjects)
         {
-            foreach (RaycastResult raycastResult in hitObjects)
+            if (TryDragFromSpawnSlot(result) || TryDragFromInventory(result))
             {
-                if (raycastResult.gameObject.TryGetComponent(out UISpawnItemSlot spawnSlot))
-                {
-                    selectedSpawnSlot = spawnSlot;
-                    selectedDraggable = spawnSlot.SpawnDraggableItem();
-                    selectedDraggable.transform.position = spawnSlot.transform.position;
-                    originPosition = spawnSlot.transform.position;
-
-                    inventory.CheckWeight(selectedDraggable.GetItemData());
-
-                    isDragging = true;
-                    Cursor.visible = false;
-                }
-
-                if (raycastResult.gameObject.TryGetComponent(out UIInventorySlot inventorySlot))
-                {
-                    if (inventory.CheckRepeatedSlot(inventorySlot.X, inventorySlot.Y))
-                        return;
-
-                    if (!inventorySlot.HasItem())
-                        return;
-
-                    Debug.Log($"Check slot [{inventorySlot.X}, {inventorySlot.Y}] | Item: {inventorySlot.GetItem().GetItemData().itemName}");
-
-                    originPosition = inventorySlot.transform.position;
-                    originX = inventorySlot.X;
-                    originY = inventorySlot.Y;
-                    selectedDraggable = inventorySlot.GetItem();
-                    selectedInventorySlot = inventorySlot;
-
-                    inventory.RemoveItem(selectedDraggable);
-
-                    isDragging = true;
-                    Cursor.visible = false;
-                }
+                isDragging = true;
+                Cursor.visible = false;
+                break;
             }
         }
-
     }
 
+    // Try to drag an item from a spawn slot
+    private bool TryDragFromSpawnSlot(RaycastResult result)
+    {
+        if (!result.gameObject.TryGetComponent(out UISpawnItemSlot spawnSlot)) return false;
+
+        selectedSpawnSlot = spawnSlot;
+        selectedDraggable = spawnSlot.SpawnDraggableItem();
+        selectedDraggable.transform.position = spawnSlot.transform.position;
+        originPosition = spawnSlot.transform.position;
+
+        inventory.CheckWeight(selectedDraggable.GetItemData());
+        return true;
+    }
+
+    // Try to drag an item from the inventory
+    private bool TryDragFromInventory(RaycastResult result)
+    {
+        if (!result.gameObject.TryGetComponent(out UIInventorySlot inventorySlot)) return false;
+
+        if (inventory.CheckRepeatedSlot(inventorySlot.X, inventorySlot.Y) || !inventorySlot.HasItem())
+            return false;
+
+        originPosition = inventorySlot.transform.position;
+        originX = inventorySlot.X;
+        originY = inventorySlot.Y;
+        selectedDraggable = inventorySlot.GetItem();
+        selectedInventorySlot = inventorySlot;
+
+        inventory.RemoveItem(selectedDraggable);
+        return true;
+    }
+
+    // Update dragged item position and check placement validity
     private void HoldDrag()
     {
-        Debug.Log($"Hold drag: {selectedDraggable == null}");
-        if (selectedDraggable != null)
+        if (selectedDraggable == null) return;
+
+        // Update item position
+        selectedDraggable.transform.position = GetGridAlignedPosition(
+            playerInputAction.point,
+            selectedDraggable.GetItemData(),
+            selectedDraggable.RotationStapes);
+
+        // Check for inventory slot interaction
+        bool overInventory = ProcessInventoryPlacement();
+
+        // Reset highlighting if not over inventory
+        if (!overInventory && selectedInventorySlot != null)
         {
-            selectedDraggable.transform.position = GetGridPosition(playerInputAction.point, selectedDraggable.GetItemData(), selectedDraggable.RotationStapes);
-
-            if (GetRaycastResults().Where(r => r.gameObject.layer == 6).Count() > 0)
-            {
-                foreach (RaycastResult raycastResult in hitObjects)
-                {
-                    if (raycastResult.gameObject.TryGetComponent(out UIInventorySlot inventorySlot))
-                    {
-                        if (inventory.CheckRepeatedSlot(inventorySlot.X, inventorySlot.Y))
-                            return;
-
-                        Debug.Log($"Check slot [{inventorySlot.X}, {inventorySlot.Y}]");
-                        DraggableItem item = selectedDraggable;
-                        inventory.CanPlaceItem(item.GetItemData(), inventorySlot.X, inventorySlot.Y, item.GetShape());
-
-                        selectedInventorySlot = inventorySlot;
-                    }
-                }
-            }
-            else if (selectedInventorySlot != null)
-            {
-                selectedInventorySlot = null;
-                inventory.UpdateAllInventorySlotHighlight();
-                inventory.ResetRepeatedSlotCheck();
-            }
+            selectedInventorySlot = null;
+            inventory.UpdateAllInventorySlotHighlight();
+            inventory.ResetRepeatedSlotCheck();
         }
     }
 
-    private void RotateDrag()
+    // Process inventory placement during drag
+    private bool ProcessInventoryPlacement()
     {
-        Debug.Log($"Rotate drag");
+        var inventoryHits = GetRaycastResults().Where(r => r.gameObject.layer == 6);
+        if (inventoryHits.Count() <= 0) return false;
+
+        foreach (RaycastResult result in inventoryHits)
+        {
+            if (result.gameObject.TryGetComponent(out UIInventorySlot inventorySlot))
+            {
+                if (inventory.CheckRepeatedSlot(inventorySlot.X, inventorySlot.Y))
+                    return true;
+
+                DraggableItem item = selectedDraggable;
+                inventory.CanPlaceItem(item.GetItemData(), inventorySlot.X, inventorySlot.Y, item.GetShape());
+                selectedInventorySlot = inventorySlot;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // Rotate the currently dragged item
+    private void RotateItem()
+    {
         if (selectedDraggable != null)
         {
             selectedDraggable.Rotate();
@@ -165,122 +176,139 @@ public class PlayerController : MonoBehaviour
         playerInputAction.rightClick = false;
     }
 
-    
-
+    // End dragging and finalize item placement
     private void CancelDrag()
     {
-        Debug.Log($"Cancel drag");
-        // Drag from inventory slot
-        if (selectedDraggable != null)
+        if (selectedDraggable == null)
         {
-            // Destroy item in drop zone
-            if (GetRaycastResults().Count > 0)
-            {
-                foreach (RaycastResult raycastResult in hitObjects)
-                {
-                    if (raycastResult.gameObject.TryGetComponent(out UIDropZone dropZone))
-                    {
-                        dropZone.DropItem(selectedDraggable);
-                        originX = -1;
-                        originY = -1;
-                    }
-                }
-            }
+            isDragging = false;
+            Cursor.visible = true;
+            return;
+        }
 
-            // Place item in inventory
+        // Try dropping in a drop zone
+        if (!TryDropInDropZone())
+        {
+            // Try placing in inventory or return to original position
             if (selectedInventorySlot != null)
             {
-                if (inventory.PlaceItem(selectedDraggable, selectedInventorySlot.X, selectedInventorySlot.Y))
-                {
-                    ItemData item = selectedDraggable.GetItemData();
-                    selectedDraggable.transform.position = GetGridPosition(selectedInventorySlot.transform.position, item, selectedDraggable.RotationStapes);
-                }
-                else
-                {
-                    Destroy(selectedDraggable.gameObject);
-                }
+                PlaceItemInInventorySlot();
             }
-            else if(originX >= 0 && originY >= 0)
+            else if (originX >= 0 && originY >= 0)
             {
-                inventory.PlaceItem(selectedDraggable, originX, originY);
-                ItemData item = selectedDraggable.GetItemData();
-                selectedDraggable.transform.position = GetGridPosition(originPosition, item, selectedDraggable.RotationStapes);
+                ReturnItemToOrigin();
             }
             else
             {
                 Destroy(selectedDraggable.gameObject);
             }
-
-            if (selectedSpawnSlot != null)
-            {
-                selectedSpawnSlot.ClearSpawnSlot();
-                selectedSpawnSlot = null;
-            }
-
-            // Reset inventory grid
-            inventory.UpdateAllInventorySlotHighlight();
-            inventory.ResetRepeatedSlotCheck();
-
-            // Reset player reference
-            selectedInventorySlot = null;
-            selectedDraggable = null;
-            originPosition = Vector3.zero;
-            originX = -1;
-            originY = -1;
         }
 
+        // Clean up spawn slot if needed
+        if (selectedSpawnSlot != null)
+        {
+            selectedSpawnSlot.ClearSpawnSlot();
+            selectedSpawnSlot = null;
+        }
+
+        // Reset inventory grid
+        inventory.UpdateAllInventorySlotHighlight();
+        inventory.ResetRepeatedSlotCheck();
+
+        // Reset player references
+        ResetDragState();
+    }
+
+    // Try to drop the item in a drop zone
+    private bool TryDropInDropZone()
+    {
+        if (GetRaycastResults().Count <= 0) return false;
+
+        foreach (RaycastResult result in hitObjects)
+        {
+            if (result.gameObject.TryGetComponent(out UIDropZone dropZone))
+            {
+                dropZone.DropItem(selectedDraggable);
+                originX = -1;
+                originY = -1;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // Place the dragged item in the selected inventory slot
+    private void PlaceItemInInventorySlot()
+    {
+        if (inventory.PlaceItem(selectedDraggable, selectedInventorySlot.X, selectedInventorySlot.Y))
+        {
+            ItemData item = selectedDraggable.GetItemData();
+            selectedDraggable.transform.position = GetGridAlignedPosition(
+                selectedInventorySlot.transform.position,
+                item,
+                selectedDraggable.RotationStapes);
+        }
+        else
+        {
+            Destroy(selectedDraggable.gameObject);
+        }
+    }
+
+    // Return the item to its original position
+    private void ReturnItemToOrigin()
+    {
+        inventory.PlaceItem(selectedDraggable, originX, originY);
+        ItemData item = selectedDraggable.GetItemData();
+        selectedDraggable.transform.position = GetGridAlignedPosition(
+            originPosition,
+            item,
+            selectedDraggable.RotationStapes);
+    }
+
+    // Reset all drag-related state variables
+    private void ResetDragState()
+    {
+        selectedInventorySlot = null;
+        selectedDraggable = null;
+        originPosition = Vector3.zero;
+        originX = -1;
+        originY = -1;
         isDragging = false;
         Cursor.visible = true;
     }
-    #region Helper
 
+    // Get raycast results for UI elements under cursor
     private List<RaycastResult> GetRaycastResults()
     {
         var pointer = new PointerEventData(EventSystem.current);
         pointer.position = playerInputAction.point;
+        hitObjects.Clear(); // Clear list to avoid memory allocation
         EventSystem.current.RaycastAll(pointer, hitObjects);
-
         return hitObjects;
     }
 
-    private float gridSize = 128f;
-    private Vector3 GetGridPosition(Vector3 position, ItemData item, int rotate)
+    // Calculate grid-aligned position based on item properties and rotation
+    private Vector3 GetGridAlignedPosition(Vector3 position, ItemData item, int rotationStep)
     {
         Vector3 newPosition = position;
-
+        float offsetX = 0, offsetY = 0;
         float customX = gridSize * item.offsetX;
         float customY = gridSize * item.offsetY;
 
-        if (item.shapeType == ShapeType.LShape)
+        // Adjust offsets based on shape type and rotation
+        switch (item.shapeType)
         {
-            switch (rotate)
-            {
-                case 1:
-                    customX = -customX;
-                    break;
-                case 2:
-                    customX = 0;
-                    customY = 0;
-                    break;
-                case 3:
-                    customY = 0;
-                    break;
-            }
-        }
-        else if(item.shapeType == ShapeType.Rectangle)
-        {
-            switch (rotate)
-            {
-                case 1:
-                case 3:
-                    customX = 0;
-                    customY = 0;
-                    break;
-            }
+            case ShapeType.LShape:
+                ApplyLShapeOffset(ref customX, ref customY, rotationStep);
+                break;
+            case ShapeType.Rectangle:
+                ApplyRectangleOffset(ref customX, ref customY, rotationStep);
+                break;
         }
 
-        float offsetX = (item.width - 1) * (gridSize * 0.5f) + customX;
-        float offsetY = (item.height - 1) * (gridSize * 0.5f) + customY;
+        offsetX = (item.width - 1) * (gridSize * 0.5f) + customX;
+        offsetY = (item.height - 1) * (gridSize * 0.5f) + customY;
 
         newPosition.x += offsetX;
         newPosition.y -= offsetY;
@@ -289,5 +317,31 @@ public class PlayerController : MonoBehaviour
         return newPosition;
     }
 
-    #endregion
+    // Apply offset adjustments for L-shaped items
+    private void ApplyLShapeOffset(ref float customX, ref float customY, int rotationStep)
+    {
+        switch (rotationStep)
+        {
+            case 1:
+                customX = -customX;
+                break;
+            case 2:
+                customX = 0;
+                customY = 0;
+                break;
+            case 3:
+                customY = 0;
+                break;
+        }
+    }
+
+    // Apply offset adjustments for rectangle-shaped items
+    private void ApplyRectangleOffset(ref float customX, ref float customY, int rotationStep)
+    {
+        if (rotationStep == 1 || rotationStep == 3)
+        {
+            customX = 0;
+            customY = 0;
+        }
+    }
 }
