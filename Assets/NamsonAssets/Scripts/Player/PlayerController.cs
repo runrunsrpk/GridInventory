@@ -3,6 +3,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using System.Collections.Generic;
 using System.Linq;
+using System.Collections;
 
 public class PlayerController : MonoBehaviour
 {
@@ -22,6 +23,8 @@ public class PlayerController : MonoBehaviour
     private UIInventorySlot selectedInventorySlot;
     private int originX = -1;
     private int originY = -1;
+    private bool isWaitingForRotation = false;
+    private float rotationDelay = 0.2f;
 
     // Control scheme property for better readability
     private bool IsMouseKeyboardScheme => playerInput.currentControlScheme == "MouseKeyboard";
@@ -44,7 +47,6 @@ public class PlayerController : MonoBehaviour
         HandleDragging();
         HandleRotation();
         HandleExitGame();
-
     }
 
     // Process drag operations based on input state
@@ -67,10 +69,37 @@ public class PlayerController : MonoBehaviour
     // Handle item rotation during drag
     private void HandleRotation()
     {
-        if (playerInputAction.leftClick && playerInputAction.rightClick && isDragging)
+        // Only allow rotation if explicitly right-clicked during drag
+        if (isDragging && playerInputAction.rightClick)
         {
-            RotateItem();
+            // Add a small delay to prevent accidental rotation
+            if (!isWaitingForRotation)
+            {
+                isWaitingForRotation = true;
+                StartCoroutine(RotateWithDelay());
+            }
         }
+    }
+
+    private IEnumerator RotateWithDelay()
+    {
+        // Wait for a short delay to confirm user really wants to rotate
+        yield return new WaitForSeconds(rotationDelay);
+
+        // Check if right click is still active
+        if (playerInputAction.rightClick && isDragging)
+        {
+            // Perform rotation
+            if (selectedDraggable != null)
+            {
+                selectedDraggable.Rotate();
+                inventory.ResetRepeatedSlotCheck();
+            }
+        }
+
+        // Reset flag and input state
+        isWaitingForRotation = false;
+        playerInputAction.rightClick = false;
     }
 
     private void HandleExitGame()
@@ -125,6 +154,9 @@ public class PlayerController : MonoBehaviour
         originY = inventorySlot.Y;
         selectedDraggable = inventorySlot.GetItem();
         selectedInventorySlot = inventorySlot;
+
+        // Reset right click flag to prevent accidental rotation
+        playerInputAction.rightClick = false;
 
         inventory.RemoveItem(selectedDraggable);
         return true;

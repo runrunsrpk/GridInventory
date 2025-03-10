@@ -35,6 +35,12 @@ public class BonusManager : IBonusManager
         public int ExistingGroupId = -1;
     }
 
+    public Dictionary<int, List<DraggableItem>> GetConnectedGroups()
+    {
+        // Return a copy of the connected groups dictionary
+        return new Dictionary<int, List<DraggableItem>>(connectedGroups);
+    }
+
     private bool IsBonus(DraggableItem item)
     {
         return item.GetConnectionGroupId() != -1 && item.GetBonusData() != null;
@@ -373,130 +379,6 @@ public class BonusManager : IBonusManager
         }
     }
 
-    // Remove an item from a group
-    private void RemoveItemFromGroup(DraggableItem item, int groupId)
-    {
-        if (!connectedGroups.ContainsKey(groupId))
-            return;
-
-        connectedGroups[groupId].Remove(item);
-
-        // If group is now empty, remove it
-        if (connectedGroups[groupId].Count == 0)
-        {
-            connectedGroups.Remove(groupId);
-            groupBonuses.Remove(groupId);
-        }
-    }
-
-    // Rebuild only groups affected by a new item
-    private void RebuildAffectedGroups(DraggableItem centerItem, HashSet<int> affectedGroupIds)
-    {
-        // Save items from affected groups
-        HashSet<DraggableItem> itemsToRebuild = new HashSet<DraggableItem> { centerItem };
-
-        foreach (int groupId in affectedGroupIds)
-        {
-            if (connectedGroups.ContainsKey(groupId))
-            {
-                foreach (var item in connectedGroups[groupId])
-                {
-                    itemsToRebuild.Add(item);
-                    item.ClearConnectionGroup();
-                    item.SetBonus(null, ItemConnectedState.Empty);
-                }
-
-                // Remove the group
-                connectedGroups.Remove(groupId);
-                groupBonuses.Remove(groupId);
-            }
-        }
-
-        // Find optimal groups for these items
-        List<DraggableItem> itemsList = itemsToRebuild.ToList();
-        List<List<DraggableItem>> components = FindConnectedComponents(itemsList);
-
-        // Process each component to find valid bonuses
-        List<BonusGroupCandidate> candidates = new List<BonusGroupCandidate>();
-
-        foreach (var component in components)
-        {
-            bool isLinear = component.Count >= 3 && IsLinearArrangement(component);
-
-            if (isLinear)
-            {
-                var sortedItems = SortItemsByPosition(component);
-                var linearCandidates = FindOptimalPartitioning(sortedItems);
-                candidates.AddRange(linearCandidates);
-            }
-            else
-            {
-                var subsetCandidates = FindAllValidSubsets(component);
-                candidates.AddRange(subsetCandidates);
-            }
-        }
-
-        // Mark candidates from existing groups for preservation
-        foreach (var candidate in candidates)
-        {
-            // Check if this candidate matches an existing group
-            foreach (int existingGroupId in existingGroupIds)
-            {
-                if (!connectedGroups.ContainsKey(existingGroupId))
-                    continue;
-
-                List<DraggableItem> existingGroup = connectedGroups[existingGroupId];
-
-                // If the candidate contains exactly the same items as an existing group
-                if (ItemsMatchExactly(candidate.Items, existingGroup))
-                {
-                    candidate.IsExistingGroup = true;
-                    candidate.ExistingGroupId = existingGroupId;
-                    break;
-                }
-            }
-        }
-
-        // Sort candidates with priority for existing groups
-        candidates.Sort((a, b) => {
-            // 1. Existing groups have highest priority
-            if (a.IsExistingGroup && !b.IsExistingGroup) return -1;
-            if (!a.IsExistingGroup && b.IsExistingGroup) return 1;
-
-            // 2. Sort by Bonus Priority
-            if (a.BonusPriority != b.BonusPriority)
-                return a.BonusPriority.CompareTo(b.BonusPriority);
-
-            // 3. Sort by Earliest Placement
-            if (a.EarliestPlacement != b.EarliestPlacement)
-                return a.EarliestPlacement.CompareTo(b.EarliestPlacement);
-
-            // 4. Sort by group size (larger is better)
-            if (a.Items.Count != b.Items.Count)
-                return b.Items.Count.CompareTo(a.Items.Count);
-
-            // 5. Sort by Bonus ID as final tiebreaker
-            return b.Bonus.bonusID.CompareTo(a.Bonus.bonusID);
-        });
-
-        // Assign groups
-        AssignGroupsFromCandidates(candidates);
-
-        // Notify UI
-        NotifyBonusChanges();
-    }
-
-    // Check if two item lists contain exactly the same items
-    private bool ItemsMatchExactly(List<DraggableItem> list1, List<DraggableItem> list2)
-    {
-        if (list1.Count != list2.Count)
-            return false;
-
-        HashSet<int> ids1 = new HashSet<int>(list1.Select(item => item.GetInstanceID()));
-
-        return list2.All(item => ids1.Contains(item.GetInstanceID()));
-    }
-
     // Assign groups from candidates
     private void AssignGroupsFromCandidates(List<BonusGroupCandidate> candidates)
     {
@@ -619,54 +501,6 @@ public class BonusManager : IBonusManager
         }
     }
 
-    // Update a specific group with a new item
-    private void UpdateGroupWithNewItem(int groupId, DraggableItem newItem)
-    {
-        if (!connectedGroups.ContainsKey(groupId)) return;
-
-        List<DraggableItem> group = connectedGroups[groupId];
-
-        // Add item to group
-        List<DraggableItem> updatedGroup = new List<DraggableItem>(group);
-        updatedGroup.Add(newItem);
-
-        // Get IDs
-        List<string> itemIds = updatedGroup.Select(item => item.GetItemData().itemID).ToList();
-
-        // Check for valid bonus
-        BonusData bonus = Database.Instance.GetBestBonusData(itemIds);
-
-        if (bonus != null)
-        {
-            // Update group
-            connectedGroups[groupId] = updatedGroup;
-            groupBonuses[groupId] = bonus;
-
-            // Update all items in group
-            foreach (var item in updatedGroup)
-            {
-                item.SetConnectionGroupId(groupId);
-
-                // Determine connection state
-                List<BonusData> higherBonuses = Database.Instance.GetHigherBonusDatas(itemIds);
-                bool hasHigherPossibility = higherBonuses.Count > 0;
-
-                ItemConnectedState state = hasHigherPossibility ?
-                    ItemConnectedState.Opened : ItemConnectedState.Closed;
-
-                item.SetBonus(bonus, state);
-            }
-
-            // Notify UI
-            NotifyBonusChanges();
-        }
-        else
-        {
-            // Fallback to focused rebuild if direct update fails
-            RebuildAffectedGroups(newItem, new HashSet<int> { groupId });
-        }
-    }
-
     // Full rebuild of all groups
     private void RebuildOptimalGroups()
     {
@@ -740,24 +574,6 @@ public class BonusManager : IBonusManager
 
         // Notify UI
         NotifyBonusChanges();
-    }
-
-    // Clear all connections
-    private void RemoveAllConnections()
-    {
-        // Clear all item connections first
-        foreach (var group in connectedGroups.Values)
-        {
-            foreach (var item in group)
-            {
-                item.ClearConnectionGroup();
-                item.SetBonus(null, ItemConnectedState.Empty);
-            }
-        }
-
-        // Clear all tracking dictionaries
-        connectedGroups.Clear();
-        groupBonuses.Clear();
     }
 
     // Helper to get all items in the grid

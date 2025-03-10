@@ -16,6 +16,9 @@ public class UIInventory : MonoBehaviour, IInventory
     [SerializeField] private UIInventorySlot slotPrefab;
     [SerializeField] private Transform slotParent;
 
+    [Header("Connection Lines")]
+    [SerializeField] private UILineConnector lineConnector;
+
     [Header("UI Setting")]
     [SerializeField] private TMP_Text currentWeightText;
     [SerializeField] private TMP_Text maxWeightText;
@@ -37,6 +40,12 @@ public class UIInventory : MonoBehaviour, IInventory
 
         // Initialize bonus manager
         bonusManager = new BonusManager(grid, width, height);
+
+        // Initialize line connector
+        if (lineConnector != null)
+        {
+            lineConnector.Initialize(bonusManager);
+        }
     }
 
     // Check if weight limit would be exceeded
@@ -135,6 +144,13 @@ public class UIInventory : MonoBehaviour, IInventory
         // Check for bonuses using the position where the item was placed
         bonusManager.CheckConnections(new Vector2Int(x, y));
 
+        // Fix: Use Invoke to delay line drawing until after item placement is complete
+        if (lineConnector != null)
+        {
+            // Delay drawing by a small amount (0.05 seconds)
+            Invoke("DrawConnectionLinesDelayed", 0.05f);
+        }
+
         return true;
     }
 
@@ -191,6 +207,20 @@ public class UIInventory : MonoBehaviour, IInventory
 
         // Re-check connections for neighboring items
         bonusManager.RecheckConnections(neighborPositions);
+
+        // Fix: Use Invoke to delay line drawing
+        if (lineConnector != null)
+        {
+            Invoke("DrawConnectionLinesDelayed", 0.05f);
+        }
+    }
+
+    private void DrawConnectionLinesDelayed()
+    {
+        if (lineConnector != null)
+        {
+            lineConnector.DrawAllConnectionLines();
+        }
     }
 
     private void SpawnInventorySlot()
