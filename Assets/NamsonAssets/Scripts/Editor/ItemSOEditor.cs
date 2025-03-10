@@ -50,12 +50,12 @@ public class ItemSOEditor : Editor
 
             EditorGUILayout.Space();
 
-            
+
             // draw grid
-            for (int x = 0; x < item.shape.GetLength(0); x++)
+            for (int y = 0; y < item.shape.GetLength(1); y++)
             {
                 EditorGUILayout.BeginHorizontal();
-                for (int y = 0; y < item.shape.GetLength(1); y++)
+                for (int x = 0; x < item.shape.GetLength(0); x++)
                 {
                     bool newValue = EditorGUILayout.Toggle(item.shape[x, y], GUILayout.Width(15), GUILayout.Height(15));
                     if (newValue != item.shape[x, y])

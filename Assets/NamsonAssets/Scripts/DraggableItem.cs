@@ -1,8 +1,6 @@
-using NUnit.Framework;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using static UnityEditor.Progress;
 
 public enum ItemConnectedState
 {
@@ -111,7 +109,14 @@ public class DraggableItem : MonoBehaviour
 
     private void SetOccupiedGrids(Vector2Int gridIndex)
     {
-        occupiedGrids = new List<Vector2Int>();
+        if (occupiedGrids == null)
+        {
+            occupiedGrids = new List<Vector2Int>();
+        }
+        else
+        {
+            occupiedGrids.Clear();
+        }
 
         bool[,] shape = rotatedShape;
         int shapeWidth = shape.GetLength(0);
@@ -148,9 +153,15 @@ public class DraggableItem : MonoBehaviour
         int originWidth = originShape.GetLength(0);
         int originHeight = originShape.GetLength(1);
 
+        // Clear previous occupied grids when rotating
+        if (occupiedGrids != null)
+        {
+            occupiedGrids.Clear();
+        }
+
         switch (rotationSteps)
         {
-            case 0: // No rotation
+            case 0: // No rotation (0 degrees)
                 rotatedShape = (bool[,])originShape.Clone();
                 break;
 
@@ -160,7 +171,8 @@ public class DraggableItem : MonoBehaviour
                 {
                     for (int y = 0; y < originHeight; y++)
                     {
-                        rotatedShape[y, originWidth - 1 - x] = originShape[x, y];
+                        // Convert coordinates properly for 270-degree rotation
+                        rotatedShape[originHeight - 1 - y, x] = originShape[x, y];
                     }
                 }
                 break;
@@ -171,6 +183,7 @@ public class DraggableItem : MonoBehaviour
                 {
                     for (int y = 0; y < originHeight; y++)
                     {
+                        // Convert coordinates properly for 180-degree rotation
                         rotatedShape[originWidth - 1 - x, originHeight - 1 - y] = originShape[x, y];
                     }
                 }
@@ -182,13 +195,20 @@ public class DraggableItem : MonoBehaviour
                 {
                     for (int y = 0; y < originHeight; y++)
                     {
-                        rotatedShape[originHeight - 1 - y, x] = originShape[x, y];
+                        // Convert coordinates properly for 90-degree rotation
+                        rotatedShape[y, originWidth - 1 - x] = originShape[x, y];
                     }
                 }
                 break;
         }
 
-        // Update visual to match the new rotation
+        // If the item is placed on the grid, update occupied grids
+        if (gridX >= 0 && gridY >= 0)
+        {
+            SetOccupiedGrids(new Vector2Int(gridX, gridY));
+        }
+
+        // Update visual rotation
         UpdateVisual();
     }
 

@@ -208,17 +208,6 @@ public class PlayerController : MonoBehaviour
         return false;
     }
 
-    // Rotate the currently dragged item
-    private void RotateItem()
-    {
-        if (selectedDraggable != null)
-        {
-            selectedDraggable.Rotate();
-            inventory.ResetRepeatedSlotCheck();
-        }
-        playerInputAction.rightClick = false;
-    }
-
     // End dragging and finalize item placement
     private void CancelDrag()
     {
@@ -291,6 +280,10 @@ public class PlayerController : MonoBehaviour
                 selectedInventorySlot.transform.position,
                 item,
                 selectedDraggable.RotationStapes);
+        }
+        else if (originX >= 0 && originY >= 0)
+        {
+            ReturnItemToOrigin();
         }
         else
         {
@@ -381,10 +374,18 @@ public class PlayerController : MonoBehaviour
     // Apply offset adjustments for rectangle-shaped items
     private void ApplyRectangleOffset(ref float customX, ref float customY, int rotationStep)
     {
-        if (rotationStep == 1 || rotationStep == 3)
+        switch (rotationStep)
         {
-            customX = 0;
-            customY = 0;
+            case 0:
+            case 2:
+                customX = 0;
+                customY = 0;
+                break;
+            case 1:
+            case 3:
+                customX = -customX;
+                customY = -customY;
+                break;
         }
     }
 }

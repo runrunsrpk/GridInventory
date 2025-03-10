@@ -228,9 +228,9 @@ public class UIInventory : MonoBehaviour, IInventory
         slotParent.GetComponent<GridLayoutGroup>().constraintCount = width;
         grid = new UIInventorySlot[width, height];
 
-        for (int x = 0; x < width; x++)
+        for (int y = 0; y < height; y++)
         {
-            for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
             {
                 UIInventorySlot slot = Instantiate(slotPrefab, slotParent);
                 slot.name = $"Slot[{x},{y}]";
