@@ -24,15 +24,15 @@ public class Database : MonoBehaviour
         LoadItemDatabase();
         LoadBonusDatabase();
 
-        List<string> playerItems = new List<string> { "002", "002"};
+        //List<string> playerItems = new List<string> { "002", "002"};
 
-        Debug.Log($"Best bonuse: {GetBestBonusData(playerItems).bonusName}");
+        //Debug.Log($"Best bonuse: {GetBestBonusData(playerItems).bonusName}");
 
-        List<BonusData> bonuses = GetAnyBonusDatas(playerItems);
-        Debug.Log($"Bonuses search: {bonuses.Count} bonuses");
+        //List<BonusData> bonuses = GetAnyBonusDatas(playerItems);
+        //Debug.Log($"Bonuses search: {bonuses.Count} bonuses");
         
-        List<BonusData> higherBonuses = GetHigherBonusDatas(playerItems);
-        Debug.Log($"Higher bonuses search: {higherBonuses.Count} bonuses");
+        //List<BonusData> higherBonuses = GetHigherBonusDatas(playerItems);
+        //Debug.Log($"Higher bonuses search: {higherBonuses.Count} bonuses");
 
         OnDatabaseLoaded?.Invoke();
     }
@@ -148,13 +148,6 @@ public class Database : MonoBehaviour
             foreach (var pair in playerCount)
             {
                 if (!requiredCount.TryGetValue(pair.Key, out int count) || count != pair.Value)
-                    return false;
-            }
-
-            // Check if every requirement exists in player items with exact same count
-            foreach (var pair in requiredCount)
-            {
-                if (!playerCount.TryGetValue(pair.Key, out int count) || count != pair.Value)
                     return false;
             }
 

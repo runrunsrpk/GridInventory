@@ -144,7 +144,7 @@ public class UIInventory : MonoBehaviour, IInventory
         // Check for bonuses using the position where the item was placed
         bonusManager.CheckConnections(new Vector2Int(x, y));
 
-        // Fix: Use Invoke to delay line drawing until after item placement is complete
+        // Use Invoke to delay line drawing until after item placement is complete
         if (lineConnector != null)
         {
             // Delay drawing by a small amount (0.05 seconds)
@@ -163,22 +163,6 @@ public class UIInventory : MonoBehaviour, IInventory
         bool[,] shape = item.GetShape();
         int shapeWidth = shape.GetLength(0);
         int shapeHeight = shape.GetLength(1);
-
-        // Store positions to check later
-        HashSet<Vector2Int> neighborPositions = new HashSet<Vector2Int>();
-
-        // Get neighboring positions to check for connections later
-        foreach (var grid in item.OccupiedGrids)
-        {
-            // Add all adjacent positions
-            foreach (var adjPos in bonusManager.GetAdjacentPositions(grid))
-            {
-                if (bonusManager.IsOccupied(adjPos))
-                {
-                    neighborPositions.Add(adjPos);
-                }
-            }
-        }
 
         // Clear grid slots
         for (int i = 0; i < shapeWidth; i++)
@@ -205,10 +189,7 @@ public class UIInventory : MonoBehaviour, IInventory
         // Update highlights
         UpdateAllInventorySlotHighlight();
 
-        // Re-check connections for neighboring items
-        bonusManager.RecheckConnections(neighborPositions);
-
-        // Fix: Use Invoke to delay line drawing
+        // Use Invoke to delay line drawing
         if (lineConnector != null)
         {
             Invoke("DrawConnectionLinesDelayed", 0.05f);

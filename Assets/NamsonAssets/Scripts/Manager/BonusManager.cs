@@ -13,9 +13,6 @@ public class BonusManager : IBonusManager
     private Dictionary<int, BonusData> groupBonuses = new Dictionary<int, BonusData>();
     private int groupCounter = 0;
 
-    // Set to track existing group IDs for preservation
-    private HashSet<int> existingGroupIds = new HashSet<int>();
-
     // Constructor with dependency injection
     public BonusManager(UIInventorySlot[,] grid, int width, int height)
     {
@@ -35,15 +32,11 @@ public class BonusManager : IBonusManager
         public int ExistingGroupId = -1;
     }
 
+    #region Check and remove bonus
     public Dictionary<int, List<DraggableItem>> GetConnectedGroups()
     {
         // Return a copy of the connected groups dictionary
         return new Dictionary<int, List<DraggableItem>>(connectedGroups);
-    }
-
-    private bool IsBonus(DraggableItem item)
-    {
-        return item.GetConnectionGroupId() != -1 && item.GetBonusData() != null;
     }
 
     // Get all current bonuses for UI display
@@ -52,11 +45,6 @@ public class BonusManager : IBonusManager
         return groupBonuses.Values.ToList();
     }
 
-    // Notify UI of bonus changes
-    private void NotifyBonusChanges()
-    {
-        UIInventory.OnBonusChanged?.Invoke(GetCurrentBonuses());
-    }
 
     // Main entry point for checking connections
     public void CheckConnections(Vector2Int startIndex)
@@ -78,6 +66,8 @@ public class BonusManager : IBonusManager
         List<DraggableItem> adjacentItems = GetAdjacentItems(item);
         List<int> adjacentBonusGroups = new List<int>();
 
+        Debug.Log($"AdjacentItems count: {adjacentItems.Count}");
+
         foreach (var adjItem in adjacentItems)
         {
             if (IsBonus(adjItem) && !adjacentBonusGroups.Contains(adjItem.GetConnectionGroupId()))
@@ -92,10 +82,12 @@ public class BonusManager : IBonusManager
             int groupId = adjacentBonusGroups[0];
             if (TryAddToExistingGroup(item, groupId))
             {
+                Debug.LogWarning($"AddToExistingGroup");
                 return;
             }
         }
-        // NEW CODE: If adjacent to multiple bonus groups, try adding to the one with lowest ID first
+
+        // If adjacent to multiple bonus groups, try adding to the one with lowest ID first
         else if (adjacentBonusGroups.Count > 1)
         {
             // Sort groups by ID (lower first)
@@ -106,6 +98,7 @@ public class BonusManager : IBonusManager
             {
                 if (TryAddToExistingGroup(item, groupId))
                 {
+                    Debug.LogWarning($"AddToExistingGroup lowest ID");
                     return;
                 }
             }
@@ -117,6 +110,7 @@ public class BonusManager : IBonusManager
         {
             if (TryFormNewGroupWithoutBreakingExisting(item, adjacentItems))
             {
+                Debug.LogWarning($"FormNewGroup");
                 return;
             }
         }
@@ -125,6 +119,98 @@ public class BonusManager : IBonusManager
         // preservation of existing bonuses
         RebuildWithStrictBonusPreservation(item);
     }
+
+    // Remove an item from inventory
+    public void RemoveItemFromGroups(DraggableItem item)
+    {
+        if (item == null) return;
+
+        int groupId = item.GetConnectionGroupId();
+
+        // If item is in a group, handle removal
+        if (groupId != -1 && connectedGroups.ContainsKey(groupId))
+        {
+            List<DraggableItem> group = connectedGroups[groupId];
+
+            // Remove item from group
+            group.Remove(item);
+            item.ClearConnectionGroup();
+            item.SetBonus(null, ItemConnectedState.Empty);
+
+            // If group still has 2+ items, check if bonus is still valid
+            if (group.Count >= 2)
+            {
+                List<string> itemIds = group.Select(i => i.GetItemData().itemID).ToList();
+                BonusData bonus = Database.Instance.GetBestBonusData(itemIds);
+
+                if (bonus != null && IsGroupConnected(group))
+                {
+                    // Update group with new bonus
+                    groupBonuses[groupId] = bonus;
+
+                    // Update all items
+                    foreach (var groupItem in group)
+                    {
+                        List<BonusData> higherBonuses = Database.Instance.GetHigherBonusDatas(itemIds);
+                        ItemConnectedState state = higherBonuses.Count > 0 ?
+                            ItemConnectedState.Opened : ItemConnectedState.Closed;
+
+                        groupItem.SetBonus(bonus, state);
+                    }
+                }
+                else
+                {
+                    // No valid bonus, remove group
+                    foreach (var groupItem in group)
+                    {
+                        groupItem.ClearConnectionGroup();
+                        groupItem.SetBonus(null, ItemConnectedState.Empty);
+                    }
+
+                    connectedGroups.Remove(groupId);
+                    groupBonuses.Remove(groupId);
+                }
+            }
+            else if (group.Count == 1)
+            {
+                // Only one item left, remove group
+                DraggableItem remainingItem = group[0];
+                remainingItem.ClearConnectionGroup();
+                remainingItem.SetBonus(null, ItemConnectedState.Empty);
+
+                connectedGroups.Remove(groupId);
+                groupBonuses.Remove(groupId);
+            }
+            else
+            {
+                // No items left, remove group
+                connectedGroups.Remove(groupId);
+                groupBonuses.Remove(groupId);
+            }
+
+            NotifyBonusChanges();
+        }
+    }
+    #endregion
+
+    #region Public helper methods
+    // Helper methods
+    public bool IsValidPosition(Vector2Int position)
+    {
+        return position.x >= 0 && position.x < width && position.y >= 0 && position.y < height;
+    }
+
+    public bool IsOccupied(Vector2Int index)
+    {
+        if (!IsValidPosition(index)) return false;
+        return grid[index.x, index.y].HasItem();
+    }
+
+    public DraggableItem GetItemAt(Vector2Int index)
+    {
+        return grid[index.x, index.y].GetItem();
+    }
+    #endregion
 
     private bool TryAddToExistingGroup(DraggableItem item, int groupId)
     {
@@ -189,14 +275,52 @@ public class BonusManager : IBonusManager
         // Try to form a bonus with available items
         List<DraggableItem> potential = new List<DraggableItem> { item };
 
+        // Try adding all available item
+        foreach (var adjItem in adjacentItems)
+        {
+            potential.Add(adjItem);
+        }
+
+        // Check if this forms a valid bonus
+        List<string> ids = potential.Select(i => i.GetItemData().itemID).ToList();
+        BonusData bonus = Database.Instance.GetBestBonusData(ids);
+
+        if (bonus != null)
+        {
+            // Create new group
+            int groupId = ++groupCounter;
+            connectedGroups[groupId] = new List<DraggableItem>(potential);
+            groupBonuses[groupId] = bonus;
+
+            // Set group on all items
+            foreach (var potentialItem in potential)
+            {
+                potentialItem.SetConnectionGroupId(groupId);
+
+                // Determine connection state
+                List<BonusData> higherBonuses = Database.Instance.GetHigherBonusDatas(ids);
+                ItemConnectedState state = higherBonuses.Count > 0 ?
+                    ItemConnectedState.Opened : ItemConnectedState.Closed;
+
+                potentialItem.SetBonus(bonus, state);
+            }
+
+            NotifyBonusChanges();
+            return true;
+        }
+
+        // Clear potential
+        potential.Clear();
+        potential.Add(item);
+
         // Try adding each available item
         foreach (var availableItem in availableItems)
         {
             potential.Add(availableItem);
 
             // Check if this forms a valid bonus
-            List<string> ids = potential.Select(i => i.GetItemData().itemID).ToList();
-            BonusData bonus = Database.Instance.GetBestBonusData(ids);
+            ids = potential.Select(i => i.GetItemData().itemID).ToList();
+            bonus = Database.Instance.GetBestBonusData(ids);
 
             if (bonus != null)
             {
@@ -369,254 +493,65 @@ public class BonusManager : IBonusManager
         NotifyBonusChanges();
     }
 
-    // Store existing groups before rebuilding
-    private void StoreExistingGroups()
+
+    private void CheckGroupCandidate(List<DraggableItem> items, List<BonusGroupCandidate> candidates)
     {
-        existingGroupIds.Clear();
-        foreach (int groupId in connectedGroups.Keys)
+        // Verify the group is connected
+        if (!IsGroupConnected(items))
+            return;
+
+        // Get item IDs for bonus lookup
+        List<string> itemIds = items.Select(item => item.GetItemData().itemID).ToList();
+
+        // Check for valid bonus
+        BonusData bonus = Database.Instance.GetBestBonusData(itemIds);
+
+        if (bonus != null)
         {
-            existingGroupIds.Add(groupId);
-        }
-    }
+            // Check if this matches an existing group
+            bool isExistingGroup = false;
+            int existingGroupId = -1;
 
-    // Assign groups from candidates
-    private void AssignGroupsFromCandidates(List<BonusGroupCandidate> candidates)
-    {
-        HashSet<int> assignedItems = new HashSet<int>();
+            // Get set of item instance IDs
+            HashSet<int> itemInstanceIds = new HashSet<int>(
+                items.Select(item => item.GetInstanceID()));
 
-        foreach (var candidate in candidates)
-        {
-            // Skip if any item is already assigned
-            if (candidate.Items.Any(item => assignedItems.Contains(item.GetInstanceID())))
-                continue;
-
-            // Create a new group or use existing ID
-            int groupId = candidate.IsExistingGroup ?
-                candidate.ExistingGroupId : ++groupCounter;
-
-            connectedGroups[groupId] = new List<DraggableItem>(candidate.Items);
-            groupBonuses[groupId] = candidate.Bonus;
-
-            // Assign items to group
-            foreach (var item in candidate.Items)
+            // Check against existing groups
+            foreach (var kvp in connectedGroups)
             {
-                item.SetConnectionGroupId(groupId);
+                if (kvp.Value.Count != items.Count)
+                    continue;
 
-                // Determine connection state
-                List<string> itemIds = candidate.Items.Select(i => i.GetItemData().itemID).ToList();
-                List<BonusData> higherBonuses = Database.Instance.GetHigherBonusDatas(itemIds);
-
-                ItemConnectedState state = ItemConnectedState.Closed;
-
-                if (higherBonuses.Count > 0)
+                // Check if all items match
+                bool allMatch = true;
+                foreach (var groupItem in kvp.Value)
                 {
-                    // Check for direct upgrade path
-                    bool hasDirectUpgradePath = higherBonuses.Any(bonus => {
-                        List<string> requiredIds = Database.Instance.GetRequiredItemsForBonus(bonus);
-                        return requiredIds.Count == itemIds.Count + 1 &&
-                               itemIds.All(id => requiredIds.Contains(id));
-                    });
-
-                    state = hasDirectUpgradePath ? ItemConnectedState.Opened : ItemConnectedState.Closed;
-                }
-
-                item.SetBonus(candidate.Bonus, state);
-                assignedItems.Add(item.GetInstanceID());
-            }
-        }
-    }
-
-    // Remove an item from inventory
-    public void RemoveItemFromGroups(DraggableItem item)
-    {
-        if (item == null) return;
-
-        int groupId = item.GetConnectionGroupId();
-
-        // If item is in a group, handle removal
-        if (groupId != -1 && connectedGroups.ContainsKey(groupId))
-        {
-            List<DraggableItem> group = connectedGroups[groupId];
-
-            // Remove item from group
-            group.Remove(item);
-            item.ClearConnectionGroup();
-            item.SetBonus(null, ItemConnectedState.Empty);
-
-            // If group still has 2+ items, check if bonus is still valid
-            if (group.Count >= 2)
-            {
-                List<string> itemIds = group.Select(i => i.GetItemData().itemID).ToList();
-                BonusData bonus = Database.Instance.GetBestBonusData(itemIds);
-
-                if (bonus != null)
-                {
-                    // Update group with new bonus
-                    groupBonuses[groupId] = bonus;
-
-                    // Update all items
-                    foreach (var groupItem in group)
+                    if (!itemInstanceIds.Contains(groupItem.GetInstanceID()))
                     {
-                        List<BonusData> higherBonuses = Database.Instance.GetHigherBonusDatas(itemIds);
-                        ItemConnectedState state = higherBonuses.Count > 0 ?
-                            ItemConnectedState.Opened : ItemConnectedState.Closed;
-
-                        groupItem.SetBonus(bonus, state);
+                        allMatch = false;
+                        break;
                     }
                 }
-                else
+
+                if (allMatch)
                 {
-                    // No valid bonus, remove group
-                    foreach (var groupItem in group)
-                    {
-                        groupItem.ClearConnectionGroup();
-                        groupItem.SetBonus(null, ItemConnectedState.Empty);
-                    }
-
-                    connectedGroups.Remove(groupId);
-                    groupBonuses.Remove(groupId);
-
-                    // Rebuild for these items
-                    RebuildOptimalGroups();
+                    isExistingGroup = true;
+                    existingGroupId = kvp.Key;
+                    break;
                 }
             }
-            else if (group.Count == 1)
-            {
-                // Only one item left, remove group
-                DraggableItem remainingItem = group[0];
-                remainingItem.ClearConnectionGroup();
-                remainingItem.SetBonus(null, ItemConnectedState.Empty);
 
-                connectedGroups.Remove(groupId);
-                groupBonuses.Remove(groupId);
-            }
-            else
+            // Create a candidate with EarliestPlacement and existing group status
+            candidates.Add(new BonusGroupCandidate
             {
-                // No items left, remove group
-                connectedGroups.Remove(groupId);
-                groupBonuses.Remove(groupId);
-            }
-
-            NotifyBonusChanges();
+                Items = items,
+                Bonus = bonus,
+                BonusPriority = bonus.priority,
+                EarliestPlacement = items.Min(item => item.PlacementOrder),
+                IsExistingGroup = isExistingGroup,
+                ExistingGroupId = existingGroupId
+            });
         }
-    }
-
-    // Full rebuild of all groups
-    private void RebuildOptimalGroups()
-    {
-        // Store existing groups for preservation
-        StoreExistingGroups();
-
-        // Clear current connection states from items
-        foreach (var group in connectedGroups.Values)
-        {
-            foreach (var item in group)
-            {
-                item.ClearConnectionGroup();
-                item.SetBonus(null, ItemConnectedState.Empty);
-            }
-        }
-
-        // Clear tracking dictionaries but keep group IDs
-        connectedGroups.Clear();
-        groupBonuses.Clear();
-
-        // Get all items in the grid
-        List<DraggableItem> allItems = GetAllItemsInGrid();
-
-        // Find all connected components
-        List<List<DraggableItem>> components = FindConnectedComponents(allItems);
-
-        // Process each component
-        List<BonusGroupCandidate> allCandidates = new List<BonusGroupCandidate>();
-
-        foreach (var component in components)
-        {
-            bool isLinear = component.Count >= 3 && IsLinearArrangement(component);
-
-            if (isLinear)
-            {
-                var sortedItems = SortItemsByPosition(component);
-                var candidates = FindOptimalPartitioning(sortedItems);
-                allCandidates.AddRange(candidates);
-            }
-            else
-            {
-                var candidates = FindAllValidSubsets(component);
-                allCandidates.AddRange(candidates);
-            }
-        }
-
-        // Sort candidates with priority for existing groups
-        allCandidates.Sort((a, b) => {
-            // 1. Existing groups have highest priority
-            if (a.IsExistingGroup && !b.IsExistingGroup) return -1;
-            if (!a.IsExistingGroup && b.IsExistingGroup) return 1;
-
-            // 2. Sort by Bonus Priority
-            if (a.BonusPriority != b.BonusPriority)
-                return a.BonusPriority.CompareTo(b.BonusPriority);
-
-            // 3. Sort by Earliest Placement
-            if (a.EarliestPlacement != b.EarliestPlacement)
-                return a.EarliestPlacement.CompareTo(b.EarliestPlacement);
-
-            // 4. Sort by group size (larger is better)
-            if (a.Items.Count != b.Items.Count)
-                return b.Items.Count.CompareTo(a.Items.Count);
-
-            // 5. Sort by Bonus ID as final tiebreaker
-            return b.Bonus.bonusID.CompareTo(a.Bonus.bonusID);
-        });
-
-        // Assign groups
-        AssignGroupsFromCandidates(allCandidates);
-
-        // Notify UI
-        NotifyBonusChanges();
-    }
-
-    // Helper to get all items in the grid
-    private List<DraggableItem> GetAllItemsInGrid()
-    {
-        List<DraggableItem> result = new List<DraggableItem>();
-        HashSet<int> processed = new HashSet<int>();
-
-        for (int x = 0; x < width; x++)
-        {
-            for (int y = 0; y < height; y++)
-            {
-                Vector2Int pos = new Vector2Int(x, y);
-                if (IsOccupied(pos))
-                {
-                    DraggableItem item = GetItemAt(pos);
-                    if (item != null && !processed.Contains(item.GetInstanceID()))
-                    {
-                        result.Add(item);
-                        processed.Add(item.GetInstanceID());
-                    }
-                }
-            }
-        }
-
-        return result;
-    }
-
-    // Helper methods
-    public bool IsValidPosition(Vector2Int position)
-    {
-        return position.x >= 0 && position.x < width && position.y >= 0 && position.y < height;
-    }
-
-    public bool IsOccupied(Vector2Int index)
-    {
-        if (!IsValidPosition(index)) return false;
-        return grid[index.x, index.y].HasItem();
-    }
-
-    public DraggableItem GetItemAt(Vector2Int index)
-    {
-        return grid[index.x, index.y].GetItem();
     }
 
     // Find all connected components in the grid
@@ -664,55 +599,6 @@ public class BonusManager : IBonusManager
         return components;
     }
 
-    // Check if two items are adjacent
-    private bool AreItemsAdjacent(DraggableItem item1, DraggableItem item2)
-    {
-        // Check each occupied grid cell from first item against each from second item
-        foreach (Vector2Int pos1 in item1.OccupiedGrids)
-        {
-            foreach (Vector2Int pos2 in item2.OccupiedGrids)
-            {
-                // Check if positions are orthogonally adjacent (Manhattan distance = 1)
-                int dx = Mathf.Abs(pos1.x - pos2.x);
-                int dy = Mathf.Abs(pos1.y - pos2.y);
-
-                // They're adjacent if they're one step away horizontally or vertically
-                if ((dx == 1 && dy == 0) || (dx == 0 && dy == 1))
-                {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    // Helper to get adjacent items
-    private List<DraggableItem> GetAdjacentItems(DraggableItem item)
-    {
-        List<DraggableItem> adjacentItems = new List<DraggableItem>();
-
-        foreach (Vector2Int grid in item.OccupiedGrids)
-        {
-            List<Vector2Int> directions = new List<Vector2Int> {
-                Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right
-            };
-
-            foreach (Vector2Int dir in directions)
-            {
-                Vector2Int adjacentPos = grid + dir;
-                if (IsValidPosition(adjacentPos) && IsOccupied(adjacentPos))
-                {
-                    DraggableItem adjacentItem = GetItemAt(adjacentPos);
-                    if (adjacentItem != null && adjacentItem != item && !adjacentItems.Contains(adjacentItem))
-                    {
-                        adjacentItems.Add(adjacentItem);
-                    }
-                }
-            }
-        }
-
-        return adjacentItems;
-    }
 
     // Find all possible subsets of a component that form valid bonuses
     private List<BonusGroupCandidate> FindAllValidSubsets(List<DraggableItem> component)
@@ -804,66 +690,6 @@ public class BonusManager : IBonusManager
 
         // Remove from visited so we can use it in other paths
         visited.Remove(current.GetInstanceID());
-    }
-
-    private void CheckGroupCandidate(List<DraggableItem> items, List<BonusGroupCandidate> candidates)
-    {
-        // Verify the group is connected
-        if (!IsGroupConnected(items))
-            return;
-
-        // Get item IDs for bonus lookup
-        List<string> itemIds = items.Select(item => item.GetItemData().itemID).ToList();
-
-        // Check for valid bonus
-        BonusData bonus = Database.Instance.GetBestBonusData(itemIds);
-
-        if (bonus != null)
-        {
-            // Check if this matches an existing group
-            bool isExistingGroup = false;
-            int existingGroupId = -1;
-
-            // Get set of item instance IDs
-            HashSet<int> itemInstanceIds = new HashSet<int>(
-                items.Select(item => item.GetInstanceID()));
-
-            // Check against existing groups
-            foreach (var kvp in connectedGroups)
-            {
-                if (kvp.Value.Count != items.Count)
-                    continue;
-
-                // Check if all items match
-                bool allMatch = true;
-                foreach (var groupItem in kvp.Value)
-                {
-                    if (!itemInstanceIds.Contains(groupItem.GetInstanceID()))
-                    {
-                        allMatch = false;
-                        break;
-                    }
-                }
-
-                if (allMatch)
-                {
-                    isExistingGroup = true;
-                    existingGroupId = kvp.Key;
-                    break;
-                }
-            }
-
-            // Create a candidate with EarliestPlacement and existing group status
-            candidates.Add(new BonusGroupCandidate
-            {
-                Items = items,
-                Bonus = bonus,
-                BonusPriority = bonus.priority,
-                EarliestPlacement = items.Min(item => item.PlacementOrder),
-                IsExistingGroup = isExistingGroup,
-                ExistingGroupId = existingGroupId
-            });
-        }
     }
 
     // Verify a group is fully connected
@@ -1044,67 +870,59 @@ public class BonusManager : IBonusManager
         return dp[n];
     }
 
-    // Recheck connections at specified positions
-    public void RecheckConnections(HashSet<Vector2Int> positions)
+
+    // Helper to get all items in the grid
+    private List<DraggableItem> GetAllItemsInGrid()
     {
-        // First pass: only check positions with no bonus
-        foreach (Vector2Int position in positions)
-        {
-            if (IsOccupied(position))
-            {
-                DraggableItem item = GetItemAt(position);
-                if (!IsBonus(item))
-                {
-                    CheckConnections(position);
-                }
-            }
-        }
+        List<DraggableItem> result = new List<DraggableItem>();
+        HashSet<int> processed = new HashSet<int>();
 
-        // Collect additional positions to check (only for non-bonus items)
-        HashSet<Vector2Int> additionalPositions = new HashSet<Vector2Int>();
-        foreach (Vector2Int position in positions)
+        for (int x = 0; x < width; x++)
         {
-            if (IsOccupied(position))
+            for (int y = 0; y < height; y++)
             {
-                DraggableItem item = GetItemAt(position);
-
-                if (!IsBonus(item) &&
-                    (item.ConnectedState == ItemConnectedState.Opened ||
-                     item.ConnectedState == ItemConnectedState.Waiting))
+                Vector2Int pos = new Vector2Int(x, y);
+                if (IsOccupied(pos))
                 {
-                    foreach (Vector2Int adjPos in GetAdjacentPositions(item))
+                    DraggableItem item = GetItemAt(pos);
+                    if (item != null && !processed.Contains(item.GetInstanceID()))
                     {
-                        if (IsOccupied(adjPos) && !positions.Contains(adjPos))
-                        {
-                            DraggableItem adjItem = GetItemAt(adjPos);
-                            if (!IsBonus(adjItem))
-                            {
-                                additionalPositions.Add(adjPos);
-                            }
-                        }
+                        result.Add(item);
+                        processed.Add(item.GetInstanceID());
                     }
                 }
             }
         }
 
-        // Check additional positions (only non-bonus items)
-        foreach (Vector2Int position in additionalPositions)
+        return result;
+    }
+
+    // Check if two items are adjacent
+    private bool AreItemsAdjacent(DraggableItem item1, DraggableItem item2)
+    {
+        // Check each occupied grid cell from first item against each from second item
+        foreach (Vector2Int pos1 in item1.OccupiedGrids)
         {
-            if (IsOccupied(position))
+            foreach (Vector2Int pos2 in item2.OccupiedGrids)
             {
-                DraggableItem item = GetItemAt(position);
-                if (!IsBonus(item))
+                // Check if positions are orthogonally adjacent (Manhattan distance = 1)
+                int dx = Mathf.Abs(pos1.x - pos2.x);
+                int dy = Mathf.Abs(pos1.y - pos2.y);
+
+                // They're adjacent if they're one step away horizontally or vertically
+                if ((dx == 1 && dy == 0) || (dx == 0 && dy == 1))
                 {
-                    CheckConnections(position);
+                    return true;
                 }
             }
         }
+        return false;
     }
 
-    // Get adjacent positions for an item
-    private List<Vector2Int> GetAdjacentPositions(DraggableItem item)
+    // Helper to get adjacent items
+    private List<DraggableItem> GetAdjacentItems(DraggableItem item)
     {
-        List<Vector2Int> adjacent = new List<Vector2Int>();
+        List<DraggableItem> adjacentItems = new List<DraggableItem>();
 
         foreach (Vector2Int grid in item.OccupiedGrids)
         {
@@ -1115,33 +933,31 @@ public class BonusManager : IBonusManager
             foreach (Vector2Int dir in directions)
             {
                 Vector2Int adjacentPos = grid + dir;
-                if (IsValidPosition(adjacentPos))
+
+                if (IsValidPosition(adjacentPos) && IsOccupied(adjacentPos))
                 {
-                    adjacent.Add(adjacentPos);
+                    DraggableItem adjacentItem = GetItemAt(adjacentPos);
+                    if (adjacentItem != null && adjacentItem != item && adjacentItem.IsOpenToConnect() && !adjacentItems.Contains(adjacentItem))
+                    {
+                        adjacentItems.Add(adjacentItem);
+                        Debug.LogWarning($"Found item {adjacentItem.GetItemData().itemName} at pos [{adjacentPos.x}, {adjacentPos.y}]");
+                    }
                 }
             }
         }
 
-        return adjacent;
+        return adjacentItems;
     }
 
-    // Get adjacent positions for a position
-    public List<Vector2Int> GetAdjacentPositions(Vector2Int position)
+    private bool IsBonus(DraggableItem item)
     {
-        List<Vector2Int> adjacent = new List<Vector2Int>();
-        List<Vector2Int> directions = new List<Vector2Int> {
-            Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right
-        };
+        return item.GetConnectionGroupId() != -1 && item.GetBonusData() != null;
+    }
 
-        foreach (Vector2Int dir in directions)
-        {
-            Vector2Int adjacentPos = position + dir;
-            if (IsValidPosition(adjacentPos))
-            {
-                adjacent.Add(adjacentPos);
-            }
-        }
 
-        return adjacent;
+    // Notify UI of bonus changes
+    private void NotifyBonusChanges()
+    {
+        UIInventory.OnBonusChanged?.Invoke(GetCurrentBonuses());
     }
 }

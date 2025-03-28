@@ -107,6 +107,11 @@ public class DraggableItem : MonoBehaviour
         connectionGroupId = -1;
     }
 
+    public bool IsOpenToConnect()
+    {
+        return connectedState != ItemConnectedState.Closed;
+    }
+
     private void SetOccupiedGrids(Vector2Int gridIndex)
     {
         if (occupiedGrids == null)
