@@ -327,10 +327,13 @@ public class PlayerController : MonoBehaviour
     // Calculate grid-aligned position based on item properties and rotation
     private Vector3 GetGridAlignedPosition(Vector3 position, ItemData item, int rotationStep)
     {
+        float screenRatioX = (float)Screen.width / 1920f;
+        float screenRatioY = (float)Screen.height / 1080f;
+
         Vector3 newPosition = position;
         float offsetX = 0, offsetY = 0;
-        float customX = gridSize * item.offsetX;
-        float customY = gridSize * item.offsetY;
+        float customX = gridSize * item.offsetX * screenRatioX;
+        float customY = gridSize * item.offsetY * screenRatioY;
 
         // Adjust offsets based on shape type and rotation
         switch (item.shapeType)
@@ -343,8 +346,8 @@ public class PlayerController : MonoBehaviour
                 break;
         }
 
-        offsetX = (item.width - 1) * (gridSize * 0.5f) + customX;
-        offsetY = (item.height - 1) * (gridSize * 0.5f) + customY;
+        offsetX = (item.width - 1) * (gridSize * 0.5f * screenRatioX) + customX;
+        offsetY = (item.height - 1) * (gridSize * 0.5f * screenRatioY) + customY;
 
         newPosition.x += offsetX;
         newPosition.y -= offsetY;

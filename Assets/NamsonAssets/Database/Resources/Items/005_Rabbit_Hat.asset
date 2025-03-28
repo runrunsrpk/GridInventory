@@ -21,4 +21,5 @@ MonoBehaviour:
   type: 1
   offsetX: -0.1
   offsetY: -0.1
+  shapeType: 0
   serializedShape: 01010101
